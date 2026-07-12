@@ -10,9 +10,10 @@ Copyright (c) 2023-2025, ARXrobotics. Licensed under the BSD 3-Clause License.
 
 ## MoveIt 2
 
-The `r5_moveit` package was generated with the MoveIt Setup Assistant and then
-adapted for real hardware and cuMotion. MoveIt 2 is distributed under the BSD
-3-Clause License.
+The MoveIt configuration in
+`isaac_ros_manipulation_arx_r5a_robot_description` was generated with the
+MoveIt Setup Assistant and then adapted for real hardware and cuMotion.
+MoveIt 2 is distributed under the BSD 3-Clause License.
 
 ## NVIDIA Isaac ROS
 

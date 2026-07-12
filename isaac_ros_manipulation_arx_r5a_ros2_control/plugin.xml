@@ -1,0 +1,10 @@
+<library path="arx_r5a_system">
+  <class
+    name="isaac_ros_manipulation_arx_r5a_ros2_control/ArxR5aSystem"
+    type="isaac_ros_manipulation_arx_r5a_ros2_control::ArxR5aSystem"
+    base_class_type="hardware_interface::SystemInterface">
+    <description>
+      Adapts ARX RobotStatus and RobotCmd topics to ros2_control position interfaces.
+    </description>
+  </class>
+</library>

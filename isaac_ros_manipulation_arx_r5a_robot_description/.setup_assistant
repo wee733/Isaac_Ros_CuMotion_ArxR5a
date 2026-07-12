@@ -1,0 +1,15 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: isaac_ros_manipulation_arx_r5a_robot_description
+    relative_path: urdf/r5a.urdf.xacro
+  srdf:
+    relative_path: srdf/r5a.srdf
+  package_settings:
+    author_name: wee733
+    author_email: wee733@users.noreply.github.com
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity

@@ -1,0 +1,12 @@
+robot_launch_file_path: $(ros2 pkg prefix --share isaac_ros_manipulation_arx_r5a_driver_utils)/launch/arx_r5a_driver.launch.py
+urdf_path: $(ros2 pkg prefix --share isaac_ros_manipulation_arx_r5a_robot_description)/urdf/r5a.urdf.xacro
+srdf_path: $(ros2 pkg prefix --share isaac_ros_manipulation_arx_r5a_robot_description)/srdf/r5a.srdf
+initial_positions_file_path: $(ros2 pkg prefix --share isaac_ros_manipulation_arx_r5a_robot_description)/config/initial_positions.yaml
+joint_limits_file_path: $(ros2 pkg prefix --share isaac_ros_manipulation_arx_r5a_robot_description)/config/joint_limits.yaml
+kinematics_file_path: $(ros2 pkg prefix --share isaac_ros_manipulation_arx_r5a_robot_description)/config/kinematics.yaml
+moveit_controllers_file_path: $(ros2 pkg prefix --share isaac_ros_manipulation_arx_r5a_robot_description)/config/moveit_controllers.yaml
+ros2_controllers_file_path: $(ros2 pkg prefix --share isaac_ros_manipulation_arx_r5a_robot_description)/config/ros2_controllers.yaml
+cumotion_urdf_file_path: $(ros2 pkg prefix --share isaac_ros_manipulation_arx_r5a_robot_description)/urdf/r5a_cumotion.urdf
+cumotion_xrdf_file_path: $(ros2 pkg prefix --share isaac_ros_manipulation_arx_r5a_robot_description)/xrdf/r5a.xrdf
+cumotion_joint_states_topic: /joint_states
+cumotion_tool_frame: link6

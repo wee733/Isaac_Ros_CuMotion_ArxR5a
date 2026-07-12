@@ -1,46 +1,64 @@
-# ARX R5A 的 Isaac ROS cuMotion 集成
+# ARX R5A 的 Isaac ROS Manipulation 适配
 
 [English](README.md)
 
-本仓库为 ARX R5A 提供 ROS 2 control、MoveIt 2 和 NVIDIA Isaac ROS
-cuMotion 集成。它通过官方 ARX ROS 2 驱动的 `/arm_status` 与 `/arm_cmd`
-话题控制六个机械臂关节和双指夹爪。
+本仓库按照 NVIDIA Isaac ROS Manipulation 的 “Bring Your Own Robot” 结构，
+为 ARX R5A 提供 ros2_control、MoveIt 2 和 GPU cuMotion 规划支持。底层
+USB/CAN 通信继续使用 ARX 官方驱动，本仓库不复制或重写厂商驱动。
 
 > [!IMPORTANT]
-> 这是社区项目，并非 ARX Robotics 或 NVIDIA 官方发布。当前已在 ROS 2
-> Jazzy 和 Isaac ROS 4.3.0 上完成实机测试；Isaac ROS 4.5 的 cuMotion
-> 参数名称不同，目前尚未验证。
+> 这是社区适配项目，并非 ARX Robotics 或 NVIDIA 官方发布。当前已在
+> ROS 2 Jazzy 与 Isaac ROS 4.3.0 上验证，同时能够根据已安装版本切换
+> Isaac ROS 4.3/4.5 的 cuMotion 参数名称。
 
-## 目录结构
+## 软件结构
 
 ```text
-src/R5a/                  R5A 描述文件与网格模型
-src/arx5_ros2_control/    ros2_control 硬件接口
-src/r5_moveit/            MoveIt、cuMotion、XRDF 与启动配置
+MoveIt API / RViz
+        ↓
+move_group → isaac_ros_cumotion_moveit → cuMotion/cuRobo GPU
+        ↓
+JointTrajectoryController
+        ↓
+ArxR5aSystem → /arm_cmd、/arm_status → ARX 官方驱动 → CAN
 ```
 
-## 环境要求
+MoveIt 仍然负责标准规划接口、场景和轨迹执行。启用 cuMotion 后，六轴机械臂
+使用 NVIDIA GPU 规划；OMPL 作为备用管线，并用于双指夹爪规划。
 
-- ARX R5A、CAN 适配器及急停装置
-- Ubuntu 24.04、ROS 2 Jazzy、MoveIt 2
-- 支持 Isaac ROS 的 NVIDIA GPU
-- Isaac ROS 4.3.0、`isaac_ros_cumotion`、`isaac_ros_cumotion_moveit`
-- 已编译的 [ARX 官方 R5 驱动](https://github.com/ARXroboticsX/R5)，用于提供
-  `arx_r5_controller` 与 `arx5_arm_msg`
+## 包结构
 
-先编译官方驱动，再在 Isaac ROS 环境中编译本仓库：
+```text
+isaac_ros_manipulation_arx_r5a_robot_description/
+  urdf/   meshes/   srdf/   xrdf/   config/
+
+isaac_ros_manipulation_arx_r5a_ros2_control/
+  ARX 话题与 ros2_control 之间的硬件适配器
+
+isaac_ros_manipulation_arx_r5a_driver_utils/
+  配置类、机器人启动工具、launch 和工作流参数
+```
+
+ARX 官方 [R5 仓库](https://github.com/ARXroboticsX/R5) 是外部依赖，负责
+发布 `/arm_status`、接收 `/arm_cmd` 并通过 CAN 控制电机。
+
+## 编译
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 source /path/to/R5/ROS2/R5_ws/install/setup.bash
 rosdep install --from-paths src --ignore-src -r -y
-colcon build --symlink-install
+colcon build --symlink-install \
+  --packages-up-to isaac_ros_manipulation_arx_r5a_driver_utils
 source install/setup.bash
 ```
 
+如果本仓库本身就是 colcon 工作区根目录，将 `--from-paths src` 改为
+`--from-paths .`。
+
 ## CAN 与官方驱动
 
-以下是已验证的 `can1`、1 Mbit/s SLCAN 配置：
+已验证的 SLCAN 配置为 `can1`、1 Mbit/s：
 
 ```bash
 sudo slcand -o -f -s8 /dev/arxcan1 can1
@@ -48,7 +66,7 @@ sudo ip link set can1 up
 ip -details -statistics link show can1
 ```
 
-在单独终端启动官方驱动，并确认状态持续更新：
+建议单独终端运行官方驱动，避免其输出污染 MoveIt/cuMotion 日志：
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -57,55 +75,74 @@ ros2 launch arx_r5_controller open_single_arm.launch.py
 ros2 topic hz /arm_status
 ```
 
-## 启动 MoveIt 2
+## 启动 MoveIt 与 cuMotion
 
-只使用 OMPL 时：
-
-```bash
-source /opt/ros/jazzy/setup.bash
-source /path/to/R5/ROS2/R5_ws/install/setup.bash
-source install/setup.bash
-ros2 launch r5_moveit real_robot.launch.py
-```
-
-## 启动 cuMotion
-
-保持官方驱动单独运行，在 Isaac ROS 环境中执行：
+在 Isaac ROS 环境中执行：
 
 ```bash
 isaac-ros activate
 source /opt/ros/jazzy/setup.bash
 source /path/to/R5/ROS2/R5_ws/install/setup.bash
-source /path/to/this/repository/install/setup.bash
-ros2 launch r5_moveit cumotion_real_robot.launch.py
+source /path/to/workspace/install/setup.bash
+ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
+  arx_r5a_driver.launch.py
 ```
 
-RViz 默认使用 `manipulator` 规划组和 `isaac_ros_cumotion` 管线。夹爪组
-`gripper` 需要切换到 `ompl`，可使用 `open`、`jia`、`close` 三个命名状态。
-cuMotion 只规划 `joint1` 到 `joint6`，末端坐标系为 `link6`。
+默认参数：
 
-已有 nvblox ESDF 环境时可启用：
+| 参数 | 默认值 | 作用 |
+|---|---:|---|
+| `start_vendor_driver` | `False` | 是否同时启动 ARX 官方驱动 |
+| `start_cumotion` | `True` | 是否将 cuMotion 设为默认机械臂规划器 |
+| `start_rviz` | `True` | 是否启动 MoveIt RViz |
+| `read_esdf_world` | `False` | 是否读取 nvblox 动态障碍物 |
+| `configure_isaac_ros_43_environment` | `True` | 补充 Isaac ROS 4.3 Python 路径 |
+
+常用模式：
 
 ```bash
-ros2 launch r5_moveit cumotion_real_robot.launch.py read_esdf_world:=True
+# 只使用 MoveIt + OMPL
+ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
+  arx_r5a_driver.launch.py start_cumotion:=False
+
+# 同时启动 ARX 官方驱动
+ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
+  arx_r5a_driver.launch.py start_vendor_driver:=True
+
+# 接入 nvblox ESDF 动态避障
+ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
+  arx_r5a_driver.launch.py read_esdf_world:=True
 ```
 
-## 配置说明
+Isaac ROS 4.5 环境已经正确提供 Python 依赖时，可设置：
 
-- `src/r5_moveit/config/r5a.xrdf` 包含 cuMotion 关节空间和碰撞球；更换相机、
-  末端工具或机械结构后必须重新校验。
-- `r5a_cumotion.urdf` 是 cuMotion 专用速度上限版本，原始 URDF 独立保留。
-- 当前关节限制、执行时间和跟踪容差来自已测试的 R5A，请结合固件与负载验证。
-- 硬件接口只有收到新鲜 `/arm_status` 后才发送命令，并限制命令超前量。
+```bash
+configure_isaac_ros_43_environment:=False
+```
 
-## 常见问题
+## 规划组与接口
 
-- `joint1 is not in list`：检查 `/joint_states` 的关节名和当前状态时间戳。
-- `INVALID_START_STATE_SELF_COLLISION`：在 RViz 检查实机姿态，并重新验证 XRDF。
-- 末点速度非零被拒绝：修改控制器配置后必须重启 ros2_control。
-- 执行超时：先比较规划时间与实机跟踪速度，不要直接关闭超时监控。
+- `manipulator`：`joint1` 到 `joint6`，默认使用 `isaac_ros_cumotion`。
+- `gripper`：`joint7` 和 `joint8`，在 RViz 中选择 `ompl`。
+- 夹爪命名状态：`open`、`jia`、`close`。
+- cuMotion 末端坐标系：`link6`。
+- 控制器 Action：`manipulator_controller/follow_joint_trajectory` 和
+  `gripper_controller/follow_joint_trajectory`。
+
+`xrdf/r5a.xrdf` 包含关节空间、加速度与 jerk 限制、工具坐标系、碰撞球和
+自碰撞忽略规则。更换相机、负载、夹爪或机械结构后必须重新校验。
+
+## 旧结构迁移
+
+```text
+r5_moveit         → robot_description + driver_utils
+arx5_ros2_control → isaac_ros_manipulation_arx_r5a_ros2_control
+```
+
+规划组、控制器 Action、ARX 话题、关节限制、XRDF、夹爪状态和执行容差均未改变。
 
 ## 安全与许可
 
-执行前清空工作区、确认急停可用并从小幅运动开始。碰撞模型不能替代现场监护
-和硬件限位。本项目采用 BSD 3-Clause License，第三方来源见 [NOTICE.md](NOTICE.md)。
+执行前清空工作区、确认关节反馈和急停，从小幅运动开始验证。GPU 规划和碰撞模型
+不能替代现场监护与硬件限位。本项目采用 BSD 3-Clause License，第三方来源见
+[NOTICE.md](NOTICE.md)。

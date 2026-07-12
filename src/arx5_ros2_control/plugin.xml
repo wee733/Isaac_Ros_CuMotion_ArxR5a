@@ -1,8 +1,0 @@
-<library path="arx5_system">
-  <class
-    name="arx5_ros2_control/Arx5System"
-    type="arx5_ros2_control::Arx5System"
-    base_class_type="hardware_interface::SystemInterface">
-    <description>ARX5 ros2_control System ...</description>
-  </class>
-</library>
