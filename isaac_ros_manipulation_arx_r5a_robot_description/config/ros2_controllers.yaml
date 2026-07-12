@@ -8,7 +8,8 @@ controller_manager:
 
 
     gripper_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
+      # Isaac ROS Manipulation open/close behaviors use GripperCommand.
+      type: position_controllers/GripperActionController
 
 
     joint_state_broadcaster:
@@ -44,19 +45,9 @@ manipulator_controller:
 gripper_controller:
   ros__parameters:
     action_monitor_rate: 20.0
-    state_publish_rate: 100.0
-    allow_partial_joints_goal: false
-    allow_nonzero_velocity_at_trajectory_end: true
-    joints:
-      - joint7
-      - joint8
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
-    constraints:
-      goal_time: 2.0
-      stopped_velocity_tolerance: 0.01
-      joint7: {trajectory: 0.01, goal: 0.003}
-      joint8: {trajectory: 0.01, goal: 0.003}
+    joint: joint7
+    goal_tolerance: 0.003
+    max_effort: 0.0
+    allow_stalling: true
+    stall_velocity_threshold: 0.001
+    stall_timeout: 1.0

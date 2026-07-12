@@ -90,15 +90,12 @@ CallbackReturn ArxR5aSystem::on_init(
     read_double("gripper_feedback_max", gripper_feedback_max_) &&
     read_double("gripper_command_max", gripper_command_max_) &&
     read_double("max_arm_command_velocity", max_arm_command_velocity_) &&
-    read_double("max_gripper_command_velocity", max_gripper_command_velocity_) &&
-    read_double("max_arm_command_lead", max_arm_command_lead_) &&
-    read_double("max_gripper_command_lead", max_gripper_command_lead_);
+    read_double("max_arm_command_lead", max_arm_command_lead_);
   status_timeout_ = std::chrono::milliseconds(status_timeout_ms);
 
   if (!parameters_valid || status_timeout_ms <= 0 || gripper_travel_ <= 0.0 ||
     gripper_feedback_max_ <= 0.0 || gripper_command_max_ <= 0.0 ||
-    max_arm_command_velocity_ <= 0.0 || max_gripper_command_velocity_ <= 0.0 ||
-    max_arm_command_lead_ <= 0.0 || max_gripper_command_lead_ <= 0.0)
+    max_arm_command_velocity_ <= 0.0 || max_arm_command_lead_ <= 0.0)
   {
     RCLCPP_ERROR(node_->get_logger(), "Hardware scale and limit parameters must be positive");
     return CallbackReturn::ERROR;
@@ -133,9 +130,9 @@ CallbackReturn ArxR5aSystem::on_init(
   RCLCPP_INFO(
     node_->get_logger(),
     "Initialized: arm_limit=%.3f rad/s, arm_lead=%.3f rad, "
-    "gripper_limit=%.3f m/s, gripper_feedback_max=%.1f",
+    "gripper_feedback_max=%.1f",
     max_arm_command_velocity_, max_arm_command_lead_,
-    max_gripper_command_velocity_, gripper_feedback_max_);
+    gripper_feedback_max_);
   return CallbackReturn::SUCCESS;
 }
 
@@ -184,10 +181,14 @@ std::vector<hardware_interface::StateInterface> ArxR5aSystem::export_state_inter
 std::vector<hardware_interface::CommandInterface> ArxR5aSystem::export_command_interfaces()
 {
   std::vector<hardware_interface::CommandInterface> interfaces;
-  interfaces.reserve(nj());
-  for (size_t index = 0; index < nj(); ++index) {
-    interfaces.emplace_back(
-      joint_names_[index], hardware_interface::HW_IF_POSITION, &cmd_pos_[index]);
+  const auto & joints = get_hardware_info().joints;
+  for (size_t index = 0; index < joints.size(); ++index) {
+    for (const auto & command_interface : joints[index].command_interfaces) {
+      if (command_interface.name == hardware_interface::HW_IF_POSITION) {
+        interfaces.emplace_back(
+          joint_names_[index], hardware_interface::HW_IF_POSITION, &cmd_pos_[index]);
+      }
+    }
   }
   return interfaces;
 }
@@ -284,18 +285,9 @@ return_type ArxR5aSystem::write(
   }
   const double requested_gripper = std::clamp(
     merge_gripper(cmd_pos_[6], cmd_pos_[7]), 0.0, gripper_travel_);
-  const double measured_gripper = merge_gripper(pos_[6], pos_[7]);
-  const double last_gripper = merge_gripper(last_sent_pos_[6], last_sent_pos_[7]);
-  const double gripper_max_step = max_gripper_command_velocity_ * seconds;
-  const double gripper_step = std::clamp(
-    requested_gripper - last_gripper, -gripper_max_step, gripper_max_step);
-  const double gripper_position = std::clamp(
-    last_gripper + gripper_step,
-    measured_gripper - max_gripper_command_lead_,
-    measured_gripper + max_gripper_command_lead_);
-  last_sent_pos_[6] = gripper_position;
-  last_sent_pos_[7] = gripper_position;
-  command.gripper = gripper_position / gripper_travel_ * gripper_command_max_;
+  last_sent_pos_[6] = requested_gripper;
+  last_sent_pos_[7] = requested_gripper;
+  command.gripper = requested_gripper / gripper_travel_ * gripper_command_max_;
 
   cmd_pub_->publish(command);
   return return_type::OK;

@@ -29,8 +29,9 @@ ArxR5aSystem -- /arm_cmd, /arm_status -- official ARX driver -- CAN
 ```
 
 MoveIt remains the standard planning and execution API. With cuMotion enabled,
-the six arm joints use NVIDIA's GPU planner; OMPL remains available as a
-fallback and is used for the two-finger gripper group.
+the six arm joints use NVIDIA's GPU planner and OMPL remains available as a
+fallback. The gripper is controlled independently through a `GripperCommand`
+action, matching the Isaac ROS Manipulation behavior-tree interface.
 
 ## Package Layout
 
@@ -137,9 +138,19 @@ set `configure_isaac_ros_43_environment:=False`.
 
 - `manipulator`: `joint1` through `joint6`; defaults to
   `isaac_ros_cumotion` when enabled.
-- `gripper`: `joint7` and `joint8`; select the `ompl` pipeline.
-- Gripper named states: `open`, `jia`, and `close`.
 - cuMotion tool frame: `link6`.
+- MoveIt controller action: `manipulator_controller/follow_joint_trajectory`.
+- Independent gripper action: `gripper_controller/gripper_cmd`.
+- Gripper positions: open `0.044`, intermediate `0.015`, closed `0.0` meters.
+
+Control the gripper independently of MoveIt:
+
+```bash
+# Open; use 0.015 for an intermediate grasp or 0.0 to close.
+ros2 action send_goal /gripper_controller/gripper_cmd \
+  control_msgs/action/GripperCommand \
+  "{command: {position: 0.044, max_effort: 0.0}}"
+```
 
 The XRDF in `xrdf/r5a.xrdf` contains the c-space, acceleration and jerk limits,
 tool frame, collision spheres, and self-collision ignore rules. Revalidate it
@@ -153,8 +164,10 @@ arx5_ros2_control                          -> isaac_ros_manipulation_arx_r5a_ros
 ros2 launch r5_moveit cumotion_real_robot  -> ros2 launch ... arx_r5a_driver.launch.py
 ```
 
-The planning groups, controller action names, ARX topics, joint limits, XRDF,
-gripper states, and execution tolerances are unchanged.
+The arm planning group, ARX topics, joint limits, and XRDF are preserved. The
+gripper is intentionally outside MoveIt and uses the `GripperCommand` action
+expected by Isaac ROS Manipulation because the ARX driver exposes one physical
+command and one feedback value.
 
 ## Safety
 

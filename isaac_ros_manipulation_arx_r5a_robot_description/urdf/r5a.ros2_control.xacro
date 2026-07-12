@@ -12,10 +12,9 @@
                 <param name="gripper_travel">0.044</param>
                 <param name="gripper_feedback_max">5.0</param>
                 <param name="gripper_command_max">5.0</param>
+                <param name="gripper_merge_policy">1</param>
                 <param name="max_arm_command_velocity">1.0</param>
-                <param name="max_gripper_command_velocity">0.02</param>
                 <param name="max_arm_command_lead">0.10</param>
-                <param name="max_gripper_command_lead">0.005</param>
                 <param name="status_timeout_ms">250</param>
             </hardware>
             <joint name="joint1">
@@ -68,7 +67,6 @@
                 <state_interface name="velocity"/>
             </joint>
             <joint name="joint8">
-                <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['joint8']}</param>
                 </state_interface>

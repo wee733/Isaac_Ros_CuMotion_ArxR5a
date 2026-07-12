@@ -123,11 +123,20 @@ configure_isaac_ros_43_environment:=False
 ## 规划组与接口
 
 - `manipulator`：`joint1` 到 `joint6`，默认使用 `isaac_ros_cumotion`。
-- `gripper`：`joint7` 和 `joint8`，在 RViz 中选择 `ompl`。
-- 夹爪命名状态：`open`、`jia`、`close`。
 - cuMotion 末端坐标系：`link6`。
-- 控制器 Action：`manipulator_controller/follow_joint_trajectory` 和
-  `gripper_controller/follow_joint_trajectory`。
+- MoveIt 控制器 Action：`manipulator_controller/follow_joint_trajectory`。
+- 夹爪不进入 MoveIt 规划，通过独立的 `gripper_controller/gripper_cmd`
+  Action 控制。
+- 夹爪位置：张开 `0.044`、中间 `0.015`、闭合 `0.0` 米。
+
+夹爪可以独立于 MoveIt 控制：
+
+```bash
+# 张开；中间夹持改为 0.015，闭合改为 0.0。
+ros2 action send_goal /gripper_controller/gripper_cmd \
+  control_msgs/action/GripperCommand \
+  "{command: {position: 0.044, max_effort: 0.0}}"
+```
 
 `xrdf/r5a.xrdf` 包含关节空间、加速度与 jerk 限制、工具坐标系、碰撞球和
 自碰撞忽略规则。更换相机、负载、夹爪或机械结构后必须重新校验。

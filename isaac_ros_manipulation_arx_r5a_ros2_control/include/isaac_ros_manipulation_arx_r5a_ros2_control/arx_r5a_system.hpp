@@ -52,9 +52,7 @@ private:
   double gripper_feedback_max_{5.0};
   double gripper_command_max_{5.0};
   double max_arm_command_velocity_{1.0};
-  double max_gripper_command_velocity_{0.02};
   double max_arm_command_lead_{0.10};
-  double max_gripper_command_lead_{0.005};
   std::chrono::milliseconds status_timeout_{250};
 
   // 0=average, 1=joint7, 2=joint8, 3=max, 4=min.
