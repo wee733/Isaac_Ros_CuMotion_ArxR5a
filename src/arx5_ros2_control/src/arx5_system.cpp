@@ -214,7 +214,9 @@ return_type Arx5System::read(const rclcpp::Time &, const rclcpp::Duration &)
   vel_[6] = gripper_velocity;
   vel_[7] = gripper_velocity;
 
-  if (!command_initialized_) {
+  const bool status_fresh =
+    std::chrono::steady_clock::now() - last_status_time_ <= status_timeout_;
+  if (!command_initialized_ && status_fresh) {
     cmd_pos_ = pos_;
     last_sent_pos_ = pos_;
     command_initialized_ = true;
