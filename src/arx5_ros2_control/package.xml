@@ -2,12 +2,15 @@
 <package format="3">
   <name>arx5_ros2_control</name>
   <version>0.0.1</version>
-  <description>ros2_control SystemInterface for ARX5 (joint1..joint8 -> RobotCmd)</description>
+  <description>ros2_control SystemInterface for the ARX R5A driver topics.</description>
 
-  <maintainer email="you@example.com">you</maintainer>
+  <maintainer email="wee733@users.noreply.github.com">wee733</maintainer>
   <license>BSD-3-Clause</license>
 
-  <!-- 关键：用 ament_cmake，而不是 catkin -->
+  <url type="website">https://github.com/wee733/Isaac_Ros_CuMotion_ArxR5a</url>
+  <url type="bugtracker">https://github.com/wee733/Isaac_Ros_CuMotion_ArxR5a/issues</url>
+  <url type="repository">https://github.com/wee733/Isaac_Ros_CuMotion_ArxR5a</url>
+
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>rclcpp</depend>
@@ -17,9 +20,7 @@
   <depend>arx5_arm_msg</depend>
 
   <export>
-    <!-- 让 pluginlib 能在 ament 索引里找到插件描述 -->
     <build_type>ament_cmake</build_type>
     <hardware_interface plugin="${prefix}/share/arx5_ros2_control/plugin.xml"/>
   </export>
 </package>
-

@@ -14,17 +14,21 @@ Visualization Manager:
       Name: Grid
       Value: true
     - Class: moveit_rviz_plugin/MotionPlanning
+      Acceleration_Scaling_Factor: 1.0
       Name: MotionPlanning
       Planned Path:
         Loop Animation: true
         State Display Time: 0.05 s
         Trajectory Topic: display_planned_path
+      Planning Request:
+        Planning Group: manipulator
       Planning Scene Topic: monitored_planning_scene
       Robot Description: robot_description
       Scene Geometry:
         Scene Alpha: 1
       Scene Robot:
         Robot Alpha: 0.5
+      Velocity_Scaling_Factor: 1.0
       Value: true
   Global Options:
     Fixed Frame: base_link

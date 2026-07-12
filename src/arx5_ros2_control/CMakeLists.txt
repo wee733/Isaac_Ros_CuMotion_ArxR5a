@@ -16,7 +16,6 @@ add_library(arx5_system SHARED src/arx5_system.cpp)
 ament_target_dependencies(arx5_system
   rclcpp pluginlib hardware_interface controller_interface arx5_arm_msg)
 
-# 关键：把插件描述注册到 ament 索引
 pluginlib_export_plugin_description_file(hardware_interface plugin.xml)
 
 install(TARGETS arx5_system
@@ -27,5 +26,4 @@ install(TARGETS arx5_system
 install(DIRECTORY include/ DESTINATION include)
 install(FILES plugin.xml DESTINATION share/${PROJECT_NAME})
 
-# 关键：ament 包尾
 ament_package()

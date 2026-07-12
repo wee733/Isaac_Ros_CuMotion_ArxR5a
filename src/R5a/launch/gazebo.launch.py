@@ -1,48 +1,58 @@
+# Copyright (c) 2023-2025 ARXrobotics
+# Copyright (c) 2026 wee733
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
+"""Spawn the ARX R5A description in Gazebo Classic."""
 
 import os
+
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess
+
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
 def replace_package_path_in_urdf(urdf_path, package_path):
-    with open(urdf_path, 'r') as urdf_file:
+    """Create a temporary URDF with absolute mesh paths for Gazebo."""
+    with open(urdf_path, 'r', encoding='utf-8') as urdf_file:
         urdf_content = urdf_file.read()
     urdf_content = urdf_content.replace('package://R5a', package_path)
-    temp_urdf_path = '/tmp/temp_R5a.urdf'
-    with open(temp_urdf_path, 'w') as temp_urdf_file:
-        temp_urdf_file.write(urdf_content)
-    return temp_urdf_path
 
+    temporary_urdf_path = '/tmp/temp_R5a.urdf'
+    with open(temporary_urdf_path, 'w', encoding='utf-8') as urdf_file:
+        urdf_file.write(urdf_content)
+    return temporary_urdf_path
 
 
 def generate_launch_description():
-    robot_name_in_model = 'R5a'
+    """Create the Gazebo launch description."""
     package_name = 'R5a'
-    urdf_name = "R5a.urdf"
+    package_share = FindPackageShare(package=package_name).find(package_name)
+    urdf_model_path = os.path.join(package_share, 'urdf', 'R5a.urdf')
+    temporary_urdf_path = replace_package_path_in_urdf(
+        urdf_model_path, package_share
+    )
 
-    ld = LaunchDescription()
-    pkg_share = FindPackageShare(package=package_name).find(package_name)
-    urdf_model_path = os.path.join(pkg_share, f'urdf/{urdf_name}')
-    mesh_model_path = os.path.join(pkg_share, 'meshes')  # 模型文件路径
-
-    # 替换 URDF 中的路径为绝对路径
-    temp_urdf_path = replace_package_path_in_urdf(urdf_model_path, pkg_share)
-
-    # Start Gazebo server
-    start_gazebo_cmd = ExecuteProcess(
-        cmd=['gazebo', '--verbose', '-s', 'libgazebo_ros_init.so', '-s', 'libgazebo_ros_factory.so'],
-        output='screen')
-
-    # Launch the robot
-    spawn_entity_cmd = Node(
+    gazebo = ExecuteProcess(
+        cmd=[
+            'gazebo',
+            '--verbose',
+            '-s',
+            'libgazebo_ros_init.so',
+            '-s',
+            'libgazebo_ros_factory.so',
+        ],
+        output='screen',
+    )
+    spawn_entity = Node(
         package='gazebo_ros',
         executable='spawn_entity.py',
-        arguments=['-entity', robot_name_in_model, '-file', temp_urdf_path],
-        output='screen')
+        arguments=['-entity', 'R5a', '-file', temporary_urdf_path],
+        output='screen',
+    )
 
-    ld.add_action(start_gazebo_cmd)
-    ld.add_action(spawn_entity_cmd)
-
-    return ld
+    return LaunchDescription([gazebo, spawn_entity])

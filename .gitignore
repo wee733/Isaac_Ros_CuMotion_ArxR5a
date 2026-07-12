@@ -1,32 +1,32 @@
-# Prerequisites
-*.d
+# colcon
+/build/
+/install/
+/log/
 
-# Compiled Object files
-*.slo
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Editors and local tooling
+.codegraph/
+.idea/
+.vscode/
+*.swp
+
+# Compiler output
+*.a
+*.d
+*.dll
+*.dylib
+*.la
+*.lib
 *.lo
 *.o
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
 *.out
-*.app
+*.so
+
+# Local source copies and generated archives
+/R5a.urdf
+*.zip

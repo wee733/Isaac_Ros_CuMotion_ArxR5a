@@ -34,7 +34,7 @@ def generate_launch_description() -> LaunchDescription:
         package="moveit_ros_move_group",
         executable="move_group",
         output="screen",
-        parameters=[moveit_config.to_dict(), controllers],
+        parameters=[moveit_config.to_dict(), controllers, {"use_sim_time": False}],
     )
 
     # 4) RViz2（同样注入机器人模型参数 + 自带的 rviz 配置）
@@ -44,9 +44,8 @@ def generate_launch_description() -> LaunchDescription:
         executable="rviz2",
         arguments=["-d", rviz_config],
         output="screen",
-        parameters=[moveit_config.to_dict()],  # 关键：给 RViz 也注入 robot_description/_semantic
+        parameters=[moveit_config.to_dict(), {"use_sim_time": False}],
     )
 
     return LaunchDescription([move_group_node, rviz_node])
-
 

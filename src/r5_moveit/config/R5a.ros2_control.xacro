@@ -10,8 +10,15 @@
                 <plugin>arx5_ros2_control/Arx5System</plugin>
                 <param name="cmd_topic">/arm_cmd</param>
                 <param name="status_topic">/arm_status</param>
-                <!-- 例如 5 表示“关节位置模式”，按你的固件协议设置 -->
                 <param name="mode">5</param>
+                <param name="gripper_travel">0.044</param>
+                <param name="gripper_feedback_max">5.0</param>
+                <param name="gripper_command_max">5.0</param>
+                <param name="max_arm_command_velocity">1.0</param>
+                <param name="max_gripper_command_velocity">0.02</param>
+                <param name="max_arm_command_lead">0.10</param>
+                <param name="max_gripper_command_lead">0.005</param>
+                <param name="status_timeout_ms">250</param>
             </hardware>
             <joint name="joint1">
                 <command_interface name="position"/>
