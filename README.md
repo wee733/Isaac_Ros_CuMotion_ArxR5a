@@ -9,9 +9,7 @@ reusing the official ARX ROS 2 driver for CAN communication.
 
 > [!IMPORTANT]
 > This is a community integration, not an official ARX Robotics or NVIDIA
-> release. It has been tested with ROS 2 Jazzy and Isaac ROS 4.3.0. The launch
-> utilities also select the documented Isaac ROS 4.5 cuMotion argument names
-> when a 4.5 package is installed.
+> release. It targets ROS 2 Jazzy and Isaac ROS 4.5.0 or newer.
 
 ## Architecture
 
@@ -56,7 +54,7 @@ external dependency. Its driver owns USB/CAN communication and publishes
 - Ubuntu 24.04 and ROS 2 Jazzy
 - MoveIt 2 and ros2_control
 - NVIDIA GPU supported by Isaac ROS
-- Isaac ROS cuMotion and cuMotion MoveIt plugin
+- Isaac ROS 4.5 or newer, including cuMotion and the cuMotion MoveIt plugin
 - Built ARX packages: `arx_r5_controller` and `arx5_arm_msg`
 
 Build from the colcon workspace that contains this repository:
@@ -113,7 +111,7 @@ The launch defaults are:
 | `start_cumotion` | `True` | Register cuMotion as the default arm planner |
 | `start_rviz` | `True` | Start MoveIt RViz |
 | `read_esdf_world` | `False` | Read dynamic obstacles from nvblox |
-| `configure_isaac_ros_43_environment` | `True` | Add Isaac ROS 4.3 CLI Python paths |
+| `cumotion_time_dilation_factor` | `1.0` | Preserve the validated full-speed cuMotion timing |
 
 Examples:
 
@@ -130,9 +128,6 @@ ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
 ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
   arx_r5a_driver.launch.py read_esdf_world:=True
 ```
-
-For Isaac ROS 4.5 environments that already provide all Python dependencies,
-set `configure_isaac_ros_43_environment:=False`.
 
 ## Planning Groups
 

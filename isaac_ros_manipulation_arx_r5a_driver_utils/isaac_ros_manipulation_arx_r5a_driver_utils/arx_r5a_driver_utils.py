@@ -7,7 +7,6 @@
 """Official-style robot controller utilities for the ARX R5A."""
 
 import os
-import xml.etree.ElementTree as ET
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -15,7 +14,7 @@ from isaac_ros_manipulation_arx_r5a_driver_utils.robot_description import (
     get_robot_description_contents,
 )
 
-from launch.actions import IncludeLaunchDescription, SetEnvironmentVariable
+from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 from launch_ros.actions import Node
@@ -32,14 +31,6 @@ DESCRIPTION_PACKAGE = 'isaac_ros_manipulation_arx_r5a_robot_description'
 def _load_yaml(path: str) -> dict:
     with open(path, 'r', encoding='utf-8') as config_file:
         return yaml.safe_load(config_file)
-
-
-def _prepend_existing(paths, variable_name):
-    values = [path for path in paths if os.path.exists(path)]
-    current_value = os.environ.get(variable_name, '')
-    if current_value:
-        values.append(current_value)
-    return os.pathsep.join(values)
 
 
 class ArxR5aDriverUtils:
@@ -182,46 +173,28 @@ class ArxR5aDriverUtils:
         )
 
     def get_cumotion_actions(self):
-        """Return environment and planner actions for installed cuMotion version."""
-        actions = []
+        """Return the Isaac ROS 4.5 cuMotion planner launch action."""
         cumotion_share = get_package_share_directory('isaac_ros_cumotion')
-        package_xml = ET.parse(os.path.join(cumotion_share, 'package.xml'))
-        version = package_xml.getroot().findtext('version', default='0.0.0')
-        major_minor = tuple(int(part) for part in version.split('.')[:2])
-
-        if (
-            major_minor < (4, 5)
-            and self.driver_config.configure_isaac_ros_43_environment
-        ):
-            actions.extend(self._get_isaac_ros_43_environment_actions())
-
         config = self.driver_config
-        if major_minor >= (4, 5):
-            launch_arguments = {
-                'cumotion_action_server.xrdf_file_path': (
-                    config.cumotion_xrdf_file_path
-                ),
-                'cumotion_action_server.urdf_file_path': (
-                    config.cumotion_urdf_file_path
-                ),
-                'cumotion_action_server.tool_frame': config.cumotion_tool_frame,
-                'cumotion_action_server.read_esdf_world': str(
-                    config.read_esdf_world
-                ),
-                'cumotion_action_server.add_ground_plane': 'False',
-                'cumotion_action_server.override_moveit_scaling_factors': 'False',
-            }
-        else:
-            launch_arguments = {
-                'cumotion_planner.robot': config.cumotion_xrdf_file_path,
-                'cumotion_planner.urdf_path': config.cumotion_urdf_file_path,
-                'cumotion_planner.tool_frame': config.cumotion_tool_frame,
-                'cumotion_planner.read_esdf_world': str(config.read_esdf_world),
-                'cumotion_planner.add_ground_plane': 'False',
-                'cumotion_planner.override_moveit_scaling_factors': 'False',
-            }
+        launch_arguments = {
+            'cumotion_action_server.xrdf_file_path': (
+                config.cumotion_xrdf_file_path
+            ),
+            'cumotion_action_server.urdf_file_path': (
+                config.cumotion_urdf_file_path
+            ),
+            'cumotion_action_server.tool_frame': config.cumotion_tool_frame,
+            'cumotion_action_server.time_dilation_factor': (
+                config.cumotion_time_dilation_factor
+            ),
+            'cumotion_action_server.read_esdf_world': str(
+                config.read_esdf_world
+            ),
+            'cumotion_action_server.add_ground_plane': 'False',
+            'cumotion_action_server.override_moveit_scaling_factors': 'False',
+        }
 
-        actions.append(
+        return [
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     os.path.join(
@@ -232,50 +205,4 @@ class ArxR5aDriverUtils:
                 ),
                 launch_arguments=launch_arguments.items(),
             )
-        )
-        return actions
-
-    @staticmethod
-    def _get_isaac_ros_43_environment_actions():
-        isaac_ros_venv = '/var/lib/isaac-ros-cli/isaac-ros'
-        venv_site_packages = os.path.join(
-            isaac_ros_venv,
-            'lib',
-            'python3.12',
-            'site-packages',
-        )
-        ros_overlay = os.path.join(
-            isaac_ros_venv,
-            'ros-deb-overlay',
-            'opt',
-            'ros',
-            'jazzy',
-        )
-        system_utils = os.path.join(
-            '/opt/ros/jazzy/lib/python3.12/site-packages',
-            'isaac_manipulator_ros_python_utils',
-        )
-        overlay_paths = [] if os.path.exists(system_utils) else [ros_overlay]
-        python_path = _prepend_existing(
-            [
-                *[
-                    os.path.join(path, 'lib', 'python3.12', 'site-packages')
-                    for path in overlay_paths
-                ],
-                venv_site_packages,
-            ],
-            'PYTHONPATH',
-        )
-        library_path = _prepend_existing(
-            [os.path.join(path, 'lib') for path in overlay_paths],
-            'LD_LIBRARY_PATH',
-        )
-        ament_prefix_path = _prepend_existing(
-            overlay_paths,
-            'AMENT_PREFIX_PATH',
-        )
-        return [
-            SetEnvironmentVariable('PYTHONPATH', python_path),
-            SetEnvironmentVariable('LD_LIBRARY_PATH', library_path),
-            SetEnvironmentVariable('AMENT_PREFIX_PATH', ament_prefix_path),
         ]

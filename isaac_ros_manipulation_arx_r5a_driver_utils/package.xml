@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>isaac_ros_manipulation_arx_r5a_driver_utils</name>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   <description>Official-style launch and configuration utilities for ARX R5A manipulation.</description>
 
   <maintainer email="wee733@users.noreply.github.com">wee733</maintainer>
@@ -17,8 +17,8 @@
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>arx_r5_controller</exec_depend>
   <exec_depend>controller_manager</exec_depend>
-  <exec_depend>isaac_ros_cumotion</exec_depend>
-  <exec_depend>isaac_ros_cumotion_moveit</exec_depend>
+  <exec_depend version_gte="4.5.0">isaac_ros_cumotion</exec_depend>
+  <exec_depend version_gte="4.5.0">isaac_ros_cumotion_moveit</exec_depend>
   <exec_depend>isaac_ros_manipulation_arx_r5a_robot_description</exec_depend>
   <exec_depend>isaac_ros_manipulation_arx_r5a_ros2_control</exec_depend>
   <exec_depend>joint_state_broadcaster</exec_depend>

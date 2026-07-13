@@ -74,11 +74,6 @@ def generate_launch_description():
             description='Read the nvblox ESDF world for obstacle avoidance.',
         ),
         DeclareLaunchArgument(
-            'configure_isaac_ros_43_environment',
-            default_value='True',
-            description='Add Isaac ROS CLI Python paths required by 4.3 deb installs.',
-        ),
-        DeclareLaunchArgument(
             'log_level',
             default_value='info',
             choices=['debug', 'info', 'warn', 'error'],
@@ -148,6 +143,11 @@ def generate_launch_description():
             'cumotion_tool_frame',
             default_value='link6',
             description='End-effector frame used by cuMotion.',
+        ),
+        DeclareLaunchArgument(
+            'cumotion_time_dilation_factor',
+            default_value='1.0',
+            description='cuMotion trajectory speed scaling in the range (0, 1].',
         ),
     ]
 

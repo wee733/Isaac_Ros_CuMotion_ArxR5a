@@ -32,9 +32,6 @@ class ArxR5aDriverConfig:
         self.start_cumotion = _get_bool(context, 'start_cumotion')
         self.start_rviz = _get_bool(context, 'start_rviz')
         self.read_esdf_world = _get_bool(context, 'read_esdf_world')
-        self.configure_isaac_ros_43_environment = _get_bool(
-            context, 'configure_isaac_ros_43_environment'
-        )
 
         self.urdf_path = _get_string(context, 'urdf_path')
         self.srdf_path = _get_string(context, 'srdf_path')
@@ -61,4 +58,7 @@ class ArxR5aDriverConfig:
             context, 'cumotion_xrdf_file_path'
         )
         self.cumotion_tool_frame = _get_string(context, 'cumotion_tool_frame')
+        self.cumotion_time_dilation_factor = _get_string(
+            context, 'cumotion_time_dilation_factor'
+        )
         self.log_level = _get_string(context, 'log_level')

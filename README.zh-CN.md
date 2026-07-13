@@ -8,8 +8,7 @@ USB/CAN 通信继续使用 ARX 官方驱动，本仓库不复制或重写厂商�
 
 > [!IMPORTANT]
 > 这是社区适配项目，并非 ARX Robotics 或 NVIDIA 官方发布。当前已在
-> ROS 2 Jazzy 与 Isaac ROS 4.3.0 上验证，同时能够根据已安装版本切换
-> Isaac ROS 4.3/4.5 的 cuMotion 参数名称。
+> ROS 2 Jazzy 与 Isaac ROS 4.5.0 上验证，并要求 Isaac ROS 4.5.0 或更高版本。
 
 ## 软件结构
 
@@ -24,7 +23,7 @@ ArxR5aSystem → /arm_cmd、/arm_status → ARX 官方驱动 → CAN
 ```
 
 MoveIt 仍然负责标准规划接口、场景和轨迹执行。启用 cuMotion 后，六轴机械臂
-使用 NVIDIA GPU 规划；OMPL 作为备用管线，并用于双指夹爪规划。
+使用 NVIDIA GPU 规划；OMPL 作为备用管线，夹爪通过独立 Action 控制。
 
 ## 包结构
 
@@ -96,7 +95,7 @@ ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
 | `start_cumotion` | `True` | 是否将 cuMotion 设为默认机械臂规划器 |
 | `start_rviz` | `True` | 是否启动 MoveIt RViz |
 | `read_esdf_world` | `False` | 是否读取 nvblox 动态障碍物 |
-| `configure_isaac_ros_43_environment` | `True` | 补充 Isaac ROS 4.3 Python 路径 |
+| `cumotion_time_dilation_factor` | `1.0` | 保持已验证的 cuMotion 全速轨迹时序 |
 
 常用模式：
 
@@ -112,12 +111,6 @@ ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
 # 接入 nvblox ESDF 动态避障
 ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
   arx_r5a_driver.launch.py read_esdf_world:=True
-```
-
-Isaac ROS 4.5 环境已经正确提供 Python 依赖时，可设置：
-
-```bash
-configure_isaac_ros_43_environment:=False
 ```
 
 ## 规划组与接口

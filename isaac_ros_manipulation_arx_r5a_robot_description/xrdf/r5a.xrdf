@@ -11,8 +11,6 @@ default_joint_positions:
   joint4: 0.0
   joint5: 0.0
   joint6: 0.0
-  joint7: 0.0
-  joint8: 0.0
 
 cspace:
   joint_names: ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
@@ -31,8 +29,6 @@ collision:
     link4: 0.002
     link5: 0.002
     link6: 0.002
-    link7: 0.0
-    link8: 0.0
 
 self_collision:
   geometry: "r5a_collision_spheres"
@@ -41,11 +37,9 @@ self_collision:
     base_link: ["link1", "link2"]
     link1: ["link2", "link3"]
     link2: ["link3"]
-    link3: ["link4", "link5", "link6", "link7", "link8"]
-    link4: ["link5", "link6", "link7", "link8"]
-    link5: ["link6", "link7", "link8"]
-    link6: ["link7", "link8"]
-    link7: ["link8"]
+    link3: ["link4", "link5", "link6"]
+    link4: ["link5", "link6"]
+    link5: ["link6"]
 
 geometry:
   r5a_collision_spheres:
@@ -147,11 +141,3 @@ geometry:
           radius: 0.035
         - center: [0.145, 0.055, 0.000]
           radius: 0.035
-      # Keep the locked gripper joints in cuRobo's kinematic tree. The full
-      # open/closed gripper envelope is already represented on link6 above.
-      link7:
-        - center: [0.0, 0.0, 0.0]
-          radius: -0.010
-      link8:
-        - center: [0.0, 0.0, 0.0]
-          radius: -0.010
