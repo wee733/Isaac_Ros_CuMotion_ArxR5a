@@ -11,6 +11,16 @@ reusing the official ARX ROS 2 driver for CAN communication.
 > This is a community integration, not an official ARX Robotics or NVIDIA
 > release. It targets ROS 2 Jazzy and Isaac ROS 4.5.0 or newer.
 
+> [!CAUTION]
+> Do not treat starting the vendor driver as a read-only connectivity test. The
+> ARX vendor library used on the target machine enables the motors during
+> initialization and runs a homing sequence; the arm may move before ROS state
+> topics appear. Also, `start_vendor_driver:=False` only prevents this launch
+> file from creating the vendor node. Once a fresh `/arm_status` is received,
+> the ros2_control adapter publishes `/arm_cmd` in `mode=5` (position control)
+> continuously. Read [Safety startup and staged validation](SAFETY_VALIDATION.md)
+> before connecting a powered robot.
+
 ## Architecture
 
 ```text
@@ -73,15 +83,29 @@ with `--from-paths .`.
 
 ## CAN and Vendor Driver
 
-The tested SLCAN configuration uses `can1` at 1 Mbit/s:
+The CAN interface name must exactly match the vendor driver's `arm_can_id`, and
+the bus rate is 1 Mbit/s. Jetson AGX Thor already exposes native interfaces such
+as `can0` and `can1`; a USB SLCAN adapter should therefore use a separate name
+such as `slcan1` instead of trying to take over native `can1`.
+
+USB SLCAN example:
 
 ```bash
-sudo slcand -o -f -s8 /dev/arxcan1 can1
-sudo ip link set can1 up
-ip -details -statistics link show can1
+sudo slcand -o -f -s8 /dev/arxcan1 slcan1
+sudo ip link set slcan1 up
+ip -details -statistics link show slcan1
 ```
 
-Run the official driver separately to keep its console output isolated:
+For native CAN, configure the selected interface for 1 Mbit/s according to the
+Thor platform wiring and verify the transceiver, termination, and physical bus.
+Do not guess between native `can1` and USB `slcan1`; the configured name and the
+actual bus must be the same.
+
+> [!WARNING]
+> The following vendor launch enables the motors and may automatically home the
+> arm. Run it only with a person present, a clear workspace, an immediately
+> reachable emergency stop, and a verified homing path. It is not a read-only
+> status command.
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -89,6 +113,10 @@ source /path/to/R5/ROS2/R5_ws/install/setup.bash
 ros2 launch arx_r5_controller open_single_arm.launch.py
 ros2 topic hz /arm_status
 ```
+
+For first contact, do not use `start_vendor_driver:=True` to bring up every
+component at once. Follow [Safety startup and staged validation](SAFETY_VALIDATION.md)
+through CAN, vendor initialization, hold, and small-motion gates.
 
 ## Launch MoveIt and cuMotion
 
@@ -113,6 +141,12 @@ The launch defaults are:
 | `read_esdf_world` | `False` | Read dynamic obstacles from nvblox |
 | `cumotion_time_dilation_factor` | `1.0` | Preserve the validated full-speed cuMotion timing |
 
+`start_vendor_driver=False` means only that this launch file does not create the
+vendor node. It does not mean that no command can reach a physical arm. If a
+vendor driver is already subscribed to `/arm_cmd` in the same ROS domain and any
+node or rosbag publishes `/arm_status`, the adapter can enter position-hold
+output. Use a separate `ROS_DOMAIN_ID` for offline validation.
+
 Examples:
 
 ```bash
@@ -120,7 +154,7 @@ Examples:
 ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
   arx_r5a_driver.launch.py start_cumotion:=False
 
-# Include the official ARX driver in the same launch
+# Supervised, fully validated systems only: this can enable and auto-home the arm
 ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
   arx_r5a_driver.launch.py start_vendor_driver:=True
 
@@ -138,7 +172,8 @@ ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
 - Independent gripper action: `gripper_controller/gripper_cmd`.
 - Gripper positions: open `0.044`, intermediate `0.015`, closed `0.0` meters.
 
-Control the gripper independently of MoveIt:
+After completing staged hardware validation, control the gripper independently
+of MoveIt. This action causes physical motion:
 
 ```bash
 # Open; use 0.015 for an intermediate grasp or 0.0 to close.
@@ -167,8 +202,17 @@ command and one feedback value.
 ## Safety
 
 Clear the workspace, verify feedback, keep the emergency stop available, and
-test small trajectories before large motions. Collision models and GPU
-planning do not replace physical supervision or hardware limits.
+test small trajectories before large motions. `RobotStatus` does not carry an
+emergency-stop, enable, or fault state, and this adapter cannot validate those
+conditions; a one-shot protective command during normal shutdown is not a
+replacement for the hardware E-stop. The default cuMotion launch does not read
+an ESDF and disables the ground plane, so tables, floors, and other physical
+obstacles are not automatically part of the planning world.
+
+See [Safety startup and staged validation](SAFETY_VALIDATION.md) for isolated
+offline startup, passive CAN checks, supervised vendor homing, position hold,
+small-motion, and cuMotion execution gates. Collision models and GPU planning
+do not replace physical supervision or hardware limits.
 
 ## License
 

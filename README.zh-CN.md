@@ -10,6 +10,14 @@ USB/CAN 通信继续使用 ARX 官方驱动，本仓库不复制或重写厂商�
 > 这是社区适配项目，并非 ARX Robotics 或 NVIDIA 官方发布。当前已在
 > ROS 2 Jazzy 与 Isaac ROS 4.5.0 上验证，并要求 Isaac ROS 4.5.0 或更高版本。
 
+> [!CAUTION]
+> 不要把“启动厂商驱动”当作只读联通测试。本机所用 ARX 厂商库在初始化时会
+> 使能电机并执行回零流程，机械臂可能在 ROS 话题出现之前就开始运动。
+> 此外，即使 `start_vendor_driver:=False`，本 launch 仍会激活 ros2_control；
+> 只要收到新鲜的 `/arm_status`，适配器就会以 `mode=5`（位置控制）持续发布
+> `/arm_cmd`，机械臂可能立即上力保持。首次接入前必须阅读
+> [安全启动与分阶段验收](SAFETY_VALIDATION.md)。
+
 ## 软件结构
 
 ```text
@@ -57,15 +65,24 @@ source install/setup.bash
 
 ## CAN 与官方驱动
 
-已验证的 SLCAN 配置为 `can1`、1 Mbit/s：
+总线接口名必须和厂商驱动的 `arm_can_id` 完全一致，速率为 1 Mbit/s。Jetson
+AGX Thor 自带名为 `can0`、`can1` 等的原生 CAN 接口，因此 USB SLCAN 不应再
+尝试占用 `can1`；可以使用 `slcan1`，并同步修改厂商驱动配置。
+
+USB SLCAN 示例：
 
 ```bash
-sudo slcand -o -f -s8 /dev/arxcan1 can1
-sudo ip link set can1 up
-ip -details -statistics link show can1
+sudo slcand -o -f -s8 /dev/arxcan1 slcan1
+sudo ip link set slcan1 up
+ip -details -statistics link show slcan1
 ```
 
-建议单独终端运行官方驱动，避免其输出污染 MoveIt/cuMotion 日志：
+使用 Thor 原生 CAN 时，应按平台说明配置对应接口为 1 Mbit/s，再确认物理
+收发器、终端电阻和实际接线。不要同时猜测使用原生 `can1` 和 USB `slcan1`。
+
+> [!WARNING]
+> 以下厂商 launch 会使能电机并可能自动回零，只能在人员现场、工作区清空、
+> 急停可立即触发且已确认回零路径安全时运行。它不是状态只读命令。
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -73,6 +90,10 @@ source /path/to/R5/ROS2/R5_ws/install/setup.bash
 ros2 launch arx_r5_controller open_single_arm.launch.py
 ros2 topic hz /arm_status
 ```
+
+首次连接不要使用 `start_vendor_driver:=True` 把所有节点一次启动；先按
+[安全启动与分阶段验收](SAFETY_VALIDATION.md) 分别验证 CAN、厂商初始化、
+位置保持和小幅运动。
 
 ## 启动 MoveIt 与 cuMotion
 
@@ -97,6 +118,11 @@ ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
 | `read_esdf_world` | `False` | 是否读取 nvblox 动态障碍物 |
 | `cumotion_time_dilation_factor` | `1.0` | 保持已验证的 cuMotion 全速轨迹时序 |
 
+`start_vendor_driver=False` 只表示本 launch 不负责创建厂商节点，并不等于
+“不会向实体机械臂发命令”。如果同一 ROS 域中已经有厂商驱动订阅 `/arm_cmd`，
+且任意节点或 rosbag 正在发布 `/arm_status`，适配器会进入位置保持输出。
+离线测试必须使用与实体驱动隔离的 `ROS_DOMAIN_ID`。
+
 常用模式：
 
 ```bash
@@ -104,7 +130,7 @@ ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
 ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
   arx_r5a_driver.launch.py start_cumotion:=False
 
-# 同时启动 ARX 官方驱动
+# 仅限已完成有人监护验收的系统：会使能并可能自动回零
 ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
   arx_r5a_driver.launch.py start_vendor_driver:=True
 
@@ -122,7 +148,7 @@ ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
   Action 控制。
 - 夹爪位置：张开 `0.044`、中间 `0.015`、闭合 `0.0` 米。
 
-夹爪可以独立于 MoveIt 控制：
+完成实机分阶段验收后，夹爪可以独立于 MoveIt 控制。该 action 会产生实体运动：
 
 ```bash
 # 张开；中间夹持改为 0.015，闭合改为 0.0。
@@ -145,6 +171,12 @@ arx5_ros2_control → isaac_ros_manipulation_arx_r5a_ros2_control
 
 ## 安全与许可
 
-执行前清空工作区、确认关节反馈和急停，从小幅运动开始验证。GPU 规划和碰撞模型
-不能替代现场监护与硬件限位。本项目采用 BSD 3-Clause License，第三方来源见
-[NOTICE.md](NOTICE.md)。
+执行前清空工作区、确认关节反馈和急停，从小幅运动开始验证。当前
+`RobotStatus` 不包含急停、使能或故障码，适配器也不能验证这些状态；正常关闭时
+发送一次保护命令不能替代硬件急停。默认 cuMotion 配置不读取 ESDF，并关闭地面
+平面，因此桌面、地面和现场障碍物不会自动进入规划。
+
+完整的隔离离线启动、被动 CAN 检查、有人监护厂商回零、位置保持、小幅轨迹和
+cuMotion 执行门槛见 [安全启动与分阶段验收](SAFETY_VALIDATION.md)。GPU 规划和
+碰撞模型不能替代现场监护与硬件限位。本项目采用 BSD 3-Clause License，第三方
+来源见 [NOTICE.md](NOTICE.md)。
