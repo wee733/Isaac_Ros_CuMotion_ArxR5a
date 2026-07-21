@@ -91,6 +91,7 @@ ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
   arx_r5a_driver.launch.py \
   start_vendor_driver:=False \
   start_cumotion:=False \
+  enable_cumotion_moveit_plugin:=False \
   start_rviz:=False
 ```
 
@@ -206,6 +207,7 @@ ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
   arx_r5a_driver.launch.py \
   start_vendor_driver:=False \
   start_cumotion:=False \
+  enable_cumotion_moveit_plugin:=False \
   start_rviz:=False
 ```
 
@@ -232,6 +234,7 @@ ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
   arx_r5a_driver.launch.py \
   start_vendor_driver:=False \
   start_cumotion:=False \
+  enable_cumotion_moveit_plugin:=False \
   start_rviz:=True
 ```
 

@@ -13,7 +13,7 @@ from isaac_ros_manipulation_arx_r5a_driver_utils import (
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 from launch_ros.substitutions import FindPackageShare
 
@@ -61,7 +61,15 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'start_cumotion',
             default_value='True',
-            description='Start cuMotion and make it the default arm planner.',
+            description='Start the standalone cuMotion action server.',
+        ),
+        DeclareLaunchArgument(
+            'enable_cumotion_moveit_plugin',
+            default_value=LaunchConfiguration('start_cumotion'),
+            description=(
+                'Register cuMotion as the default MoveIt planning pipeline. '
+                'Defaults to the value of start_cumotion.'
+            ),
         ),
         DeclareLaunchArgument(
             'start_rviz',
@@ -147,7 +155,9 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'cumotion_time_dilation_factor',
             default_value='1.0',
-            description='cuMotion trajectory speed scaling in the range (0, 1].',
+            description=(
+                'cuMotion trajectory speed scaling in the range (0, 1].'
+            ),
         ),
     ]
 

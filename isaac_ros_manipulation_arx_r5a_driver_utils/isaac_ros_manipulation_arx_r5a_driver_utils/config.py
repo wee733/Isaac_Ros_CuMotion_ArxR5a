@@ -30,6 +30,9 @@ class ArxR5aDriverConfig:
         self.use_sim_time = _get_bool(context, 'use_sim_time')
         self.start_vendor_driver = _get_bool(context, 'start_vendor_driver')
         self.start_cumotion = _get_bool(context, 'start_cumotion')
+        self.enable_cumotion_moveit_plugin = _get_bool(
+            context, 'enable_cumotion_moveit_plugin'
+        )
         self.start_rviz = _get_bool(context, 'start_rviz')
         self.read_esdf_world = _get_bool(context, 'read_esdf_world')
 

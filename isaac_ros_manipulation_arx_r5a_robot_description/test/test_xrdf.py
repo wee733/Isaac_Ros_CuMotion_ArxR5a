@@ -40,3 +40,41 @@ def test_mimic_joints_have_no_default_position():
     }
     default_joints = set(_load_xrdf()['default_joint_positions'])
     assert mimic_joints.isdisjoint(default_joints)
+
+
+def test_pick_and_place_attachment_frames_exist():
+    """Require the ROS TF and XRDF frames used by object attachment."""
+    xrdf = _load_xrdf()
+    add_frames = [
+        modifier['add_frame']
+        for modifier in xrdf['modifiers']
+        if 'add_frame' in modifier
+    ]
+    attached_object = next(
+        frame for frame in add_frames
+        if frame['frame_name'] == 'attached_object'
+    )
+    assert attached_object['parent_frame_name'] == 'grasp_frame'
+    assert xrdf['tool_frames'][0] == 'link6'
+    assert xrdf['collision']['buffer_distance']['attached_object'] > 0.0
+
+    for urdf_path in (
+        PACKAGE_ROOT / 'urdf' / 'r5a.urdf',
+        PACKAGE_ROOT / 'urdf' / 'r5a_cumotion.urdf',
+    ):
+        urdf = ET.parse(urdf_path).getroot()
+        grasp_joint = next(
+            joint for joint in urdf.findall('joint')
+            if joint.attrib['name'] == 'grasp_frame_joint'
+        )
+        assert grasp_joint.attrib['type'] == 'fixed'
+        assert grasp_joint.find('parent').attrib['link'] == 'link6'
+        assert grasp_joint.find('child').attrib['link'] == 'grasp_frame'
+
+
+def test_gripper_collision_spheres_cover_both_fingers():
+    """Keep both moving fingers in robot segmentation and collision checking."""
+    xrdf = _load_xrdf()
+    sphere_groups = xrdf['geometry']['r5a_collision_spheres']['spheres']
+    assert sphere_groups['link7']
+    assert sphere_groups['link8']

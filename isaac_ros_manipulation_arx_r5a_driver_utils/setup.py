@@ -14,7 +14,7 @@ package_name = 'isaac_ros_manipulation_arx_r5a_driver_utils'
 
 setup(
     name=package_name,
-    version='0.2.0',
+    version='0.3.0',
     packages=[package_name],
     data_files=[
         (

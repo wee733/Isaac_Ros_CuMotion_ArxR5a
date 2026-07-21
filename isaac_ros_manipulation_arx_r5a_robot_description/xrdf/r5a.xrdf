@@ -3,6 +3,14 @@ format_version: 1.0
 
 modifiers:
   - set_base_frame: "base_link"
+  - add_frame:
+      frame_name: "attached_object"
+      parent_frame_name: "grasp_frame"
+      joint_name: "attach_joint"
+      joint_type: FIXED
+      fixed_transform:
+        position: [0.0, 0.0, 0.0]
+        orientation: {w: 1.0, xyz: [0.0, 0.0, 0.0]}
 
 default_joint_positions:
   joint1: 0.0
@@ -29,6 +37,9 @@ collision:
     link4: 0.002
     link5: 0.002
     link6: 0.002
+    link7: 0.002
+    link8: 0.002
+    attached_object: 0.002
 
 self_collision:
   geometry: "r5a_collision_spheres"
@@ -39,7 +50,10 @@ self_collision:
     link2: ["link3"]
     link3: ["link4", "link5", "link6"]
     link4: ["link5", "link6"]
-    link5: ["link6"]
+    link5: ["link6", "link7", "link8"]
+    link6: ["link7", "link8"]
+    link7: ["link8"]
+    attached_object: ["link5", "link6", "link7", "link8"]
 
 geometry:
   r5a_collision_spheres:
@@ -141,3 +155,13 @@ geometry:
           radius: 0.035
         - center: [0.145, 0.055, 0.000]
           radius: 0.035
+      link7:
+        - center: [0.005, -0.035, 0.000]
+          radius: 0.032
+        - center: [0.045, -0.035, 0.000]
+          radius: 0.032
+      link8:
+        - center: [0.005, 0.035, 0.000]
+          radius: 0.032
+        - center: [0.045, 0.035, 0.000]
+          radius: 0.032

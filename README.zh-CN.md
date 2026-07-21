@@ -102,10 +102,15 @@ source install/setup.bash
 | 参数 | 默认值 | 作用 |
 |---|---:|---|
 | `start_vendor_driver` | `False` | 是否从该 launch 启动 ARX 驱动 |
-| `start_cumotion` | `True` | 是否使用 cuMotion 规划机械臂 |
+| `start_cumotion` | `True` | 是否启动独立的 cuMotion Action Server |
+| `enable_cumotion_moveit_plugin` | 跟随 `start_cumotion` | 是否将 cuMotion 注册为 MoveIt 默认规划管线 |
 | `start_rviz` | `True` | 是否启动 MoveIt RViz |
 | `read_esdf_world` | `False` | 是否读取 nvblox ESDF 障碍物世界 |
 | `cumotion_time_dilation_factor` | `1.0` | 轨迹速度因子 `(0, 1]` |
+
+插件默认跟随 `start_cumotion`，因此原有的 `start_cumotion:=False` 仍是纯 OMPL
+流程。如果 cuMotion Server 由另一个 launch 启动，或上层直接调用其 Action，请显式
+设置这两个参数。
 
 默认不需要设置 ROS domain。如果本机还有其他 DDS 系统，可在终端 2 和终端 3
 启动前同时设置：
@@ -124,6 +129,16 @@ export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 - 机械臂 Action：`/manipulator_controller/follow_joint_trajectory`
 - 夹爪 Action：`/gripper_controller/gripper_cmd`
 - 夹爪位置：张开 `0.044`、中间 `0.015`、闭合 `0.0` 米
+
+## 完整 Manipulation Overlay
+
+相机、感知、行为树、nvblox 和完整抓放流程已经拆分到独立、无需修改 NVIDIA
+官方源码的 overlay 仓库：
+
+https://github.com/wee733/isaac_ros_manipulation_arx_r5a
+
+本仓库继续只负责 ARX 机器人模型、XRDF、ros2_control、MoveIt 和 standalone
+cuMotion 基础能力。
 
 ## 常见问题
 

@@ -106,10 +106,15 @@ The launch defaults already enable cuMotion and RViz. Common overrides are:
 | Argument | Default | Purpose |
 |---|---:|---|
 | `start_vendor_driver` | `False` | Start the ARX driver from this launch |
-| `start_cumotion` | `True` | Use cuMotion as the arm planner |
+| `start_cumotion` | `True` | Start the standalone cuMotion action server |
+| `enable_cumotion_moveit_plugin` | value of `start_cumotion` | Make cuMotion the default MoveIt planning pipeline |
 | `start_rviz` | `True` | Start MoveIt RViz |
 | `read_esdf_world` | `False` | Read an nvblox ESDF obstacle world |
 | `cumotion_time_dilation_factor` | `1.0` | Trajectory speed factor `(0, 1]` |
+
+Keeping the plugin default coupled to `start_cumotion` preserves the existing
+`start_cumotion:=False` OMPL-only workflow. Set the two arguments explicitly
+when a separate launch owns the cuMotion server or calls its action directly.
 
 No custom ROS domain is required. If the machine has another DDS system, set
 the following in both Terminal 2 and Terminal 3 before launching:
@@ -128,6 +133,16 @@ export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 - Arm action: `/manipulator_controller/follow_joint_trajectory`
 - Gripper action: `/gripper_controller/gripper_cmd`
 - Gripper positions: open `0.044`, intermediate `0.015`, closed `0.0` metres
+
+## Complete Manipulation Overlay
+
+The maintained camera, perception, behavior-tree, nvblox, and pick-and-place
+workflow lives in the separate patch-free overlay repository:
+
+https://github.com/wee733/isaac_ros_manipulation_arx_r5a
+
+This repository remains responsible for the ARX robot description, XRDF,
+ros2_control hardware, MoveIt integration, and standalone cuMotion operation.
 
 ## Troubleshooting
 

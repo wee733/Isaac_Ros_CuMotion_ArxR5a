@@ -118,7 +118,7 @@ class ArxR5aDriverUtils:
             .to_moveit_configs()
         )
 
-        if config.start_cumotion:
+        if config.enable_cumotion_moveit_plugin:
             cumotion_config_path = os.path.join(
                 get_package_share_directory('isaac_ros_cumotion_moveit'),
                 'config',
