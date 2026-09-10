@@ -149,8 +149,12 @@ cuMotion 基础能力。
 - MoveIt 看不到驱动：两个 ROS 终端必须使用相同的 domain、发现范围和 RMW。
 - KDL 的 `base_link has an inertia` 警告不会阻止当前固定基座模型进行规划。
 
-完整的实机分阶段检查见 [SAFETY_VALIDATION.md](SAFETY_VALIDATION.md)。
+实体运动前应依次完成离线配置、被动 CAN 检查、有人监护的回零、当前位置保持、
+低速单关节运动，最后再进行 cuMotion 规划与执行。操作时应确保硬件急停随手可及，
+并遵循 ARX 官方手册。
 
 ## 许可
 
-本项目采用 BSD 3-Clause License，第三方来源见 [NOTICE.md](NOTICE.md)。
+本项目采用 BSD 3-Clause License。机器人描述和网格资产派生自采用 BSD 3-Clause
+License 的 [ARXroboticsX/R5](https://github.com/ARXroboticsX/R5)；MoveIt 配置由
+MoveIt Setup Assistant 生成，NVIDIA Isaac ROS 软件包均为外部依赖。

@@ -156,9 +156,14 @@ ros2_control hardware, MoveIt integration, and standalone cuMotion operation.
 - The KDL `base_link has an inertia` warning does not block this fixed-base
   model from planning.
 
-Detailed staged hardware checks are in
-[SAFETY_VALIDATION.md](SAFETY_VALIDATION.md).
+Before commanding physical motion, validate the system in stages: offline
+configuration, passive CAN checks, supervised homing, current-position hold,
+low-speed single-joint motion, and finally cuMotion planning and execution.
+Keep the hardware emergency stop within reach and follow the ARX manual.
 
 ## License
 
-BSD 3-Clause. See [NOTICE.md](NOTICE.md) for third-party attribution.
+BSD 3-Clause. The robot description and mesh assets are derived from the
+official [ARXroboticsX/R5](https://github.com/ARXroboticsX/R5) project under
+the BSD 3-Clause License. MoveIt configuration was generated with the MoveIt
+Setup Assistant; NVIDIA Isaac ROS packages remain external dependencies.

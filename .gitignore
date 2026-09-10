@@ -27,6 +27,10 @@ __pycache__/
 *.out
 *.so
 
-# Local source copies and generated archives
+# Local-only source copies, notes, and generated archives
 /R5a.urdf
+/assets/
+/asstes/
 *.zip
+/NOTICE.md
+/SAFETY_VALIDATION.md
