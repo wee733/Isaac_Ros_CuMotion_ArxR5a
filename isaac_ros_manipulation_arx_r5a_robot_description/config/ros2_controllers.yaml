@@ -6,11 +6,9 @@ controller_manager:
     manipulator_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-
     gripper_controller:
       # Isaac ROS Manipulation open/close behaviors use GripperCommand.
       type: position_controllers/GripperActionController
-
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster

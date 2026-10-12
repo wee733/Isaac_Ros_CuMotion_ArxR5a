@@ -30,9 +30,15 @@ setup(
     maintainer='wee733',
     maintainer_email='wee733@users.noreply.github.com',
     description=(
-        'Official-style launch and configuration utilities for ARX R5A '
-        'manipulation.'
+        'Launch and configuration utilities for running the ARX R5A with '
+        'MoveIt 2 and Isaac ROS cuMotion.'
     ),
     license='BSD-3-Clause',
     tests_require=['pytest'],
+    entry_points={
+        'console_scripts': [
+            'plan_joint_target = '
+            'isaac_ros_manipulation_arx_r5a_driver_utils.plan_joint_target:main',
+        ],
+    },
 )

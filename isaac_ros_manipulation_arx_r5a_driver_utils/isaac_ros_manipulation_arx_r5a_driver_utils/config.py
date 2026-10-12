@@ -6,6 +6,8 @@
 
 """Launch-time configuration for the ARX R5A driver stack."""
 
+import math
+
 from launch import LaunchContext
 from launch.substitutions import LaunchConfiguration
 
@@ -64,4 +66,7 @@ class ArxR5aDriverConfig:
         self.cumotion_time_dilation_factor = _get_string(
             context, 'cumotion_time_dilation_factor'
         )
+        factor = float(self.cumotion_time_dilation_factor)
+        if not math.isfinite(factor) or not 0.0 < factor <= 1.0:
+            raise ValueError('cumotion_time_dilation_factor must be in (0, 1]')
         self.log_level = _get_string(context, 'log_level')

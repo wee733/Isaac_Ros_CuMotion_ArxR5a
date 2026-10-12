@@ -4,7 +4,7 @@
 # license that can be found in the LICENSE file or at
 # https://developers.google.com/open-source/licenses/bsd
 
-"""Official-style robot controller utilities for the ARX R5A."""
+"""Launch action builders for the ARX R5A driver stack."""
 
 import os
 
@@ -30,7 +30,10 @@ DESCRIPTION_PACKAGE = 'isaac_ros_manipulation_arx_r5a_robot_description'
 
 def _load_yaml(path: str) -> dict:
     with open(path, 'r', encoding='utf-8') as config_file:
-        return yaml.safe_load(config_file)
+        contents = yaml.safe_load(config_file)
+    if not isinstance(contents, dict):
+        raise ValueError(f'Expected a YAML mapping in {path}')
+    return contents
 
 
 class ArxR5aDriverUtils:
@@ -162,7 +165,7 @@ class ArxR5aDriverUtils:
         )
 
     def get_vendor_driver_launch(self):
-        """Return the official ARX single-arm driver launch action."""
+        """Return the ARX vendor single-arm driver launch action."""
         driver_launch = os.path.join(
             get_package_share_directory('arx_r5_controller'),
             'launch',
@@ -176,6 +179,13 @@ class ArxR5aDriverUtils:
         """Return the Isaac ROS 4.5 cuMotion planner launch action."""
         cumotion_share = get_package_share_directory('isaac_ros_cumotion')
         config = self.driver_config
+        # Isaac ROS 4.5 reads tool frames from XRDF, not a tool_frame parameter.
+        tool_frames = _load_yaml(config.cumotion_xrdf_file_path).get('tool_frames', [])
+        if config.cumotion_tool_frame not in tool_frames:
+            raise ValueError(
+                f'cuMotion tool frame {config.cumotion_tool_frame!r} is not in '
+                f'{config.cumotion_xrdf_file_path}: tool_frames={tool_frames!r}'
+            )
         launch_arguments = {
             'cumotion_action_server.xrdf_file_path': (
                 config.cumotion_xrdf_file_path
@@ -183,7 +193,6 @@ class ArxR5aDriverUtils:
             'cumotion_action_server.urdf_file_path': (
                 config.cumotion_urdf_file_path
             ),
-            'cumotion_action_server.tool_frame': config.cumotion_tool_frame,
             'cumotion_action_server.time_dilation_factor': (
                 config.cumotion_time_dilation_factor
             ),

@@ -10,15 +10,15 @@ from isaac_ros_manipulation_arx_r5a_driver_utils import (
     ArxR5aDriverConfig,
     ArxR5aDriverUtils,
 )
+from isaac_ros_manipulation_arx_r5a_driver_utils.arx_r5a_driver_utils import (
+    DESCRIPTION_PACKAGE,
+)
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 from launch_ros.substitutions import FindPackageShare
-
-
-DESCRIPTION_PACKAGE = 'isaac_ros_manipulation_arx_r5a_robot_description'
 
 
 def launch_setup(context, *args, **kwargs):
@@ -44,7 +44,7 @@ def launch_setup(context, *args, **kwargs):
 
 
 def generate_launch_description():
-    """Generate the official-style ARX R5A driver launch description."""
+    """Generate the ARX R5A driver launch description."""
     description_share = FindPackageShare(DESCRIPTION_PACKAGE)
 
     declared_arguments = [
@@ -56,7 +56,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'start_vendor_driver',
             default_value='False',
-            description='Include the official ARX single-arm driver launch.',
+            description='Include the ARX vendor single-arm driver launch.',
         ),
         DeclareLaunchArgument(
             'start_cumotion',
@@ -150,7 +150,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'cumotion_tool_frame',
             default_value='link6',
-            description='End-effector frame used by cuMotion.',
+            description='Expected cuMotion tool frame; must be listed in the XRDF.',
         ),
         DeclareLaunchArgument(
             'cumotion_time_dilation_factor',

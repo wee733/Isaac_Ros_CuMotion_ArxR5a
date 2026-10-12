@@ -78,3 +78,29 @@ def test_gripper_collision_spheres_cover_both_fingers():
     sphere_groups = xrdf['geometry']['r5a_collision_spheres']['spheres']
     assert sphere_groups['link7']
     assert sphere_groups['link8']
+
+
+def test_planning_models_share_geometry_and_limits():
+    """Prevent drift between MoveIt and cuMotion robot descriptions."""
+    moveit = ET.parse(PACKAGE_ROOT / 'urdf' / 'r5a.urdf').getroot()
+    cumotion = ET.parse(URDF_PATH).getroot()
+    limits = yaml.safe_load(
+        (PACKAGE_ROOT / 'config' / 'joint_limits.yaml').read_text()
+    )['joint_limits']
+    for model in (moveit, cumotion):
+        for joint in model.findall('joint'):
+            limit = joint.find('limit')
+            if limit is None:
+                continue
+            configured = limits[joint.attrib['name']]
+            if model is cumotion:
+                assert float(limit.attrib['velocity']) == configured['max_velocity']
+            limit.attrib.pop('velocity')
+    assert ET.tostring(moveit) == ET.tostring(cumotion)
+
+    xrdf = _load_xrdf()
+    names = xrdf['cspace']['joint_names']
+    assert names == [f'joint{i}' for i in range(1, 7)]
+    assert xrdf['cspace']['acceleration_limits'] == [
+        limits[name]['max_acceleration'] for name in names
+    ]
