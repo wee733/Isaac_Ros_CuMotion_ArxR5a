@@ -1,39 +1,100 @@
-# Isaac ROS 4.5 Manipulation for ARX R5A
+<div align="center">
 
-[中文说明](README.zh-CN.md)
+# ARX R5A × Isaac ROS cuMotion
 
-Community integration for running a physical ARX R5A with ros2_control,
-MoveIt 2, RViz, and NVIDIA Isaac ROS cuMotion. The ARX vendor driver continues
-to own CAN communication; this repository supplies the robot model, hardware
-adapter, and planning configuration.
+**GPU-accelerated motion planning for the ARX R5A arm with MoveIt 2 and ros2_control**
 
-Tested on Jetson AGX Thor, Ubuntu 24.04, ROS 2 Jazzy, and Isaac ROS 4.5.0.
+[![ROS 2 Jazzy](https://img.shields.io/badge/ROS%202-Jazzy-22314E?logo=ros)](https://docs.ros.org/en/jazzy/)
+[![Isaac ROS 4.5](https://img.shields.io/badge/Isaac%20ROS-4.5-76B900?logo=nvidia)](https://nvidia-isaac-ros.github.io/v/release-4.5/)
+[![MoveIt 2](https://img.shields.io/badge/MoveIt-2-1E5AA8)](https://moveit.ai/)
+[![Platform](https://img.shields.io/badge/platform-Jetson%20AGX%20Thor%20%7C%20Ubuntu%2024.04-informational)](#requirements)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue)](LICENSE)
 
-> This is a community integration, not an official ARX Robotics or NVIDIA
-> release.
+English | [简体中文](README.zh-CN.md)
+
+</div>
+
+## Overview
+
+This repository connects a physical **ARX R5A** to **NVIDIA Isaac ROS cuMotion**.
+Plan in RViz or through the MoveIt API, and the trajectory is executed on the real
+arm through ros2_control. The ARX vendor driver keeps ownership of CAN
+communication; this repository supplies the robot model, planning configuration,
+and a hardware adapter that speaks the vendor's ROS 2 topics.
+
+```text
+RViz / MoveIt client → move_group → Isaac ROS cuMotion → trajectory
+                          ↓
+               joint_trajectory_controller
+                          ↓
+                    ArxR5aSystem  ── /arm_cmd ──▶  ARX vendor driver ↔ CAN ↔ R5A
+                                  ◀─ /arm_status ─
+```
+
+**Features**
+
+- cuMotion registered as MoveIt's default planning pipeline, with OMPL as an option
+- URDF, SRDF, and XRDF (collision spheres, tool frames) for the R5A
+- `ArxR5aSystem` ros2_control plugin with command rate and lead limiting
+- Arm trajectory and `GripperCommand` actions
+- A plan-only CLI to confirm that requests are served by cuMotion
+
+> Community project, not affiliated with ARX Robotics or NVIDIA.
+> Camera perception, nvblox, and pick-and-place live in the separate
+> [manipulation overlay](https://github.com/wee733/isaac_ros_manipulation_arx_r5a).
+
+## Requirements
+
+| Component | Version |
+|---|---|
+| Hardware | ARX R5A, Jetson AGX Thor (reference) or another CUDA-capable NVIDIA GPU |
+| OS / ROS | Ubuntu 24.04, ROS 2 Jazzy |
+| Isaac ROS | 4.5, with `isaac_ros_cumotion` and `isaac_ros_cumotion_moveit` |
+| ARX driver | [ARXroboticsX/R5](https://github.com/ARXroboticsX/R5) ROS 2 packages `arx5_arm_msg` and `arx_r5_controller` |
 
 ## Quick Start
 
-These commands assume the tested layout below and an already-built workspace:
+### 1. Prepare dependencies
 
-```text
-~/workspaces/isaac_ros-dev
-~/workspaces/R5
+1. Set up the [Isaac ROS 4.5 environment](https://nvidia-isaac-ros.github.io/v/release-4.5/getting_started/index.html)
+   and install cuMotion following the
+   [cuMotion MoveIt quickstart](https://nvidia-isaac-ros.github.io/v/release-4.5/repositories_and_packages/isaac_ros_cumotion/isaac_ros_cumotion_moveit/index.html).
+2. Clone [ARXroboticsX/R5](https://github.com/ARXroboticsX/R5) (for example to
+   `~/workspaces/R5`) and make `ROS2/R5_ws/src/arxmsgros2` and
+   `ROS2/R5_ws/src/ARX_R5_ros2_V7` available to your workspace. Before building it,
+   apply two changes:
+   - `arx_r5_controller/src/R5Controller.cpp`: the four `joint_pos` / `joint_vel`
+     copy loops use `i <= 7` on seven-element arrays. Change them to `i < 7`.
+   - On Jetson Thor, `can1` collides with the native CAN interface. Set the
+     interface to `slcan1` in both `ARX_CAN/arx_can/arx_can1.sh` and
+     `arx_r5_controller/config/single_arm.yaml` (`arm_can_id`).
+
+### 2. Build
+
+```bash
+export ISAAC_ROS_WS="$HOME/workspaces/isaac_ros-dev"
+git clone https://github.com/wee733/Isaac_Ros_CuMotion_ArxR5a.git \
+  "$ISAAC_ROS_WS/src/Isaac_Ros_CuMotion_ArxR5a"
+
+cd "$ISAAC_ROS_WS"
+isaac-ros activate          # enter the Isaac ROS 4.5 environment
+source /opt/ros/jazzy/setup.bash
+rosdep install --from-paths src --ignore-src -y
+colcon build --symlink-install \
+  --packages-up-to isaac_ros_manipulation_arx_r5a_driver_utils
+source install/setup.bash
 ```
 
-### Terminal 1 — CAN
+### 3. Run
+
+**Terminal 1 — CAN**
 
 ```bash
 cd ~/workspaces/R5/ARX_CAN/arx_can
 ./arx_can1.sh
 ```
 
-Keep it running. The tested configuration uses `/dev/arxcan1`, SocketCAN
-interface `slcan1`, and `arm_can_id: slcan1`. Do not start a second `slcand`.
-
-### Terminal 2 — ARX driver
-
-The vendor C++ driver runs on the host and does not need `isaac-ros activate`.
+**Terminal 2 — ARX driver** (publishes `/arm_status`)
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -41,129 +102,78 @@ source ~/workspaces/isaac_ros-dev/install/setup.bash
 ros2 launch arx_r5_controller open_single_arm.launch.py
 ```
 
-Keep it running. A working driver continuously publishes `/arm_status`.
-
-### Terminal 3 — MoveIt, cuMotion, and RViz
+**Terminal 3 — MoveIt, cuMotion, and RViz**
 
 ```bash
 cd ~/workspaces/isaac_ros-dev
 isaac-ros activate
-```
-
-After the prompt changes to `(isaac-ros)`:
-
-```bash
-source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 ros2 launch isaac_ros_manipulation_arx_r5a_driver_utils \
-  arx_r5a_driver.launch.py \
-  cumotion_time_dilation_factor:=0.1
+  arx_r5a_driver.launch.py cumotion_time_dilation_factor:=0.1
 ```
 
-RViz starts automatically. Select planning group `manipulator`, choose a
-target, then click **Plan** or **Plan & Execute**. The tested startup speed
-factor is `0.1`; it can be raised to `1.0` later.
+In RViz, select the `manipulator` planning group, drag the goal, then click
+**Plan** or **Plan & Execute**. `0.1` is a conservative speed factor for first
+runs; raise it toward `1.0` once motion looks right.
 
-### Verify
-
-In another terminal:
+### 4. Verify cuMotion planning
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-source ~/workspaces/isaac_ros-dev/install/setup.bash
-ros2 topic hz /arm_status
 ros2 control list_controllers
-ros2 action list -t | grep -E 'cumotion|follow_joint_trajectory|gripper_cmd'
+ros2 param get /move_group default_planning_pipeline   # isaac_ros_cumotion
+ros2 run isaac_ros_manipulation_arx_r5a_driver_utils plan_joint_target \
+  --joints 0.0 1.0 1.5 0.0 0.0 0.0
 ```
 
-`joint_state_broadcaster`, `manipulator_controller`, and `gripper_controller`
-should all be `active`.
+`plan_joint_target` requests a joint-space plan from the `isaac_ros_cumotion`
+pipeline and prints the result as JSON. It never executes the trajectory and
+exits nonzero if planning fails.
 
-## Build
+## Launch Options
 
-Place this repository and the required ARX ROS 2 packages in
-`~/workspaces/isaac_ros-dev/src`, then run:
+| Argument | Default | Description |
+|---|---|---|
+| `start_vendor_driver` | `False` | Also launch the ARX driver from this launch file |
+| `start_cumotion` | `True` | Start the cuMotion action server |
+| `enable_cumotion_moveit_plugin` | follows `start_cumotion` | Use cuMotion as MoveIt's default pipeline |
+| `start_rviz` | `True` | Start RViz with the MoveIt panel |
+| `read_esdf_world` | `False` | Use an nvblox ESDF for obstacle avoidance |
+| `cumotion_time_dilation_factor` | `1.0` | Trajectory speed factor in `(0, 1]` |
+| `cumotion_tool_frame` | `link6` | Tool frame; must be listed in the XRDF |
 
-```bash
-cd ~/workspaces/isaac_ros-dev
-isaac-ros activate
-```
-
-Inside the Isaac ROS environment:
-
-```bash
-source /opt/ros/jazzy/setup.bash
-rosdep install --from-paths src --ignore-src -r -y
-colcon build --symlink-install \
-  --packages-up-to isaac_ros_manipulation_arx_r5a_driver_utils
-source install/setup.bash
-```
-
-## Useful Options
-
-The launch defaults already enable cuMotion and RViz. Common overrides are:
-
-| Argument | Default | Purpose |
-|---|---:|---|
-| `start_vendor_driver` | `False` | Start the ARX driver from this launch |
-| `start_cumotion` | `True` | Start the standalone cuMotion action server |
-| `enable_cumotion_moveit_plugin` | value of `start_cumotion` | Make cuMotion the default MoveIt planning pipeline |
-| `start_rviz` | `True` | Start MoveIt RViz |
-| `read_esdf_world` | `False` | Read an nvblox ESDF obstacle world |
-| `cumotion_time_dilation_factor` | `1.0` | Trajectory speed factor `(0, 1]` |
-
-Keeping the plugin default coupled to `start_cumotion` preserves the existing
-`start_cumotion:=False` OMPL-only workflow. Set the two arguments explicitly
-when a separate launch owns the cuMotion server or calls its action directly.
-
-No custom ROS domain is required. If the machine has another DDS system, set
-the following in both Terminal 2 and Terminal 3 before launching:
-
-```bash
-export ROS_DOMAIN_ID=42
-export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-```
+Use `start_cumotion:=False` for OMPL only, or
+`start_cumotion:=False enable_cumotion_moveit_plugin:=True` when another launch
+owns the cuMotion server. Run with `--show-args` for file-path overrides.
 
 ## Interfaces
 
-- Planning group: `manipulator` (`joint1` through `joint6`)
-- cuMotion tool frame: `link6`
-- ARX topics: `/arm_status`, `/arm_cmd`
-- Arm action: `/manipulator_controller/follow_joint_trajectory`
-- Gripper action: `/gripper_controller/gripper_cmd`
-- Gripper positions: open `0.044`, intermediate `0.015`, closed `0.0` metres
+| Interface | Value |
+|---|---|
+| Planning group | `manipulator` (`joint1`–`joint6`, radians) |
+| Base / tool frame | `base_link` / `link6`; `grasp_frame` for object attachment |
+| Arm action | `/manipulator_controller/follow_joint_trajectory` |
+| Gripper action | `/gripper_controller/gripper_cmd` (`0.0` closed, `0.044` m open) |
+| Vendor topics | `/arm_status` (`RobotStatus`), `/arm_cmd` (`RobotCmd`) |
 
-## Complete Manipulation Overlay
+## Repository Layout
 
-The maintained camera, perception, behavior-tree, nvblox, and pick-and-place
-workflow lives in the separate patch-free overlay repository:
+| Package | Contents |
+|---|---|
+| [`isaac_ros_manipulation_arx_r5a_robot_description`](isaac_ros_manipulation_arx_r5a_robot_description) | URDF/xacro, meshes, SRDF, XRDF, MoveIt and controller configs |
+| [`isaac_ros_manipulation_arx_r5a_ros2_control`](isaac_ros_manipulation_arx_r5a_ros2_control) | `ArxR5aSystem` hardware plugin (C++) |
+| [`isaac_ros_manipulation_arx_r5a_driver_utils`](isaac_ros_manipulation_arx_r5a_driver_utils) | Launch file, launch helpers, overlay params, `plan_joint_target` |
 
-https://github.com/wee733/isaac_ros_manipulation_arx_r5a
+`r5a.urdf` is used by MoveIt, with velocity limits from `config/joint_limits.yaml`.
+`r5a_cumotion.urdf` is the same model with those limits written in, because
+cuMotion reads them from the URDF. A unit test keeps the two in sync.
 
-This repository remains responsible for the ARX robot description, XRDF,
-ros2_control hardware, MoveIt integration, and standalone cuMotion operation.
+## Contributing
 
-## Troubleshooting
-
-- `START_STATE_INVALID` with `joint2` outside `[0, 3]`: pull the current branch,
-  rebuild, and source the workspace. The current MoveIt and cuMotion models
-  allow the measured near-home tolerance down to `-0.01 rad`.
-- No `/arm_status`: check `slcan1`, `arm_can_id`, and that only one `slcand`
-  process exists.
-- MoveIt cannot see the driver: both ROS terminals must use the same domain,
-  discovery range, and RMW implementation.
-- The KDL `base_link has an inertia` warning does not block this fixed-base
-  model from planning.
-
-Before commanding physical motion, validate the system in stages: offline
-configuration, passive CAN checks, supervised homing, current-position hold,
-low-speed single-joint motion, and finally cuMotion planning and execution.
-Keep the hardware emergency stop within reach and follow the ARX manual.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for
+code style and the checks to run.
 
 ## License
 
-BSD 3-Clause. The robot description and mesh assets are derived from the
-official [ARXroboticsX/R5](https://github.com/ARXroboticsX/R5) project under
-the BSD 3-Clause License. MoveIt configuration was generated with the MoveIt
-Setup Assistant; NVIDIA Isaac ROS packages remain external dependencies.
+[BSD 3-Clause](LICENSE). The robot description and meshes are derived from
+[ARXroboticsX/R5](https://github.com/ARXroboticsX/R5) (BSD 3-Clause). NVIDIA
+Isaac ROS and the ARX SDK are external dependencies under their own licenses.

@@ -7,6 +7,8 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+*.egg-info/
+.ruff_cache/
 
 # Editors and local tooling
 .codegraph/
@@ -30,7 +32,10 @@ __pycache__/
 # Local-only source copies, notes, and generated archives
 /R5a.urdf
 /assets/
-/asstes/
 *.zip
 /NOTICE.md
 /SAFETY_VALIDATION.md
+
+# Local documentation and validation artifacts (already tracked files remain tracked)
+/docs/
+/test/
