@@ -12,7 +12,6 @@
                 <param name="gripper_travel">0.044</param>
                 <param name="gripper_feedback_max">5.0</param>
                 <param name="gripper_command_max">5.0</param>
-                <param name="gripper_merge_policy">1</param>
                 <param name="max_arm_command_velocity">1.0</param>
                 <param name="max_arm_command_lead">0.10</param>
                 <param name="status_timeout_ms">250</param>

@@ -9,8 +9,11 @@
 #include <algorithm>
 #include <cmath>
 #include <exception>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 
+#include <hardware_interface/lexical_casts.hpp>
 #include <pluginlib/class_list_macros.hpp>
 
 using hardware_interface::CallbackReturn;
@@ -19,20 +22,61 @@ using hardware_interface::return_type;
 namespace isaac_ros_manipulation_arx_r5a_ros2_control
 {
 
-double ArxR5aSystem::merge_gripper(double joint7, double joint8) const
+namespace
 {
-  switch (gripper_merge_policy_) {
-    case 1:
-      return joint7;
-    case 2:
-      return joint8;
-    case 3:
-      return std::max(joint7, joint8);
-    case 4:
-      return std::min(joint7, joint8);
-    default:
-      return 0.5 * (joint7 + joint8);
+
+// joint1..joint6 are the arm; joint7 and joint8 are the gripper fingers.
+constexpr size_t kArmJointCount = 6;
+constexpr size_t kJointCount = 8;
+constexpr size_t kJoint7 = 6;
+constexpr size_t kJoint8 = 7;
+
+// RobotCmd::mode for the vendor PROTECT state (arx_r5_src InterfacesThread::state).
+constexpr int kVendorModeProtect = 2;
+
+// Used when the controller manager reports an invalid period (200 Hz update rate).
+constexpr double kFallbackPeriodSeconds = 0.005;
+
+// Read an optional hardware parameter. A missing parameter keeps its default.
+template<typename ParameterMap, typename T>
+bool read_parameter(
+  const ParameterMap & parameters, const char * name, T & value,
+  const rclcpp::Logger & logger)
+{
+  const auto it = parameters.find(name);
+  if (it == parameters.end()) {
+    return true;
   }
+  try {
+    // hardware_interface parsers are locale-independent and reject trailing characters.
+    if constexpr (std::is_same_v<T, int>) {
+      value = hardware_interface::stoi32(it->second);
+    } else if constexpr (std::is_same_v<T, double>) {
+      value = hardware_interface::stod(it->second);
+      if (!std::isfinite(value)) {
+        throw std::invalid_argument("expected a finite number");
+      }
+    } else {
+      value = it->second;
+    }
+    return true;
+  } catch (const std::exception & error) {
+    RCLCPP_ERROR(logger, "Invalid %s: %s", name, error.what());
+    return false;
+  }
+}
+
+}  // namespace
+
+double ArxR5aSystem::to_vendor_gripper(double position) const
+{
+  return position / gripper_travel_ * gripper_command_max_;
+}
+
+bool ArxR5aSystem::status_fresh() const
+{
+  return status_ready_ &&
+         std::chrono::steady_clock::now() - last_status_time_ <= status_timeout_;
 }
 
 CallbackReturn ArxR5aSystem::on_init(
@@ -44,82 +88,76 @@ CallbackReturn ArxR5aSystem::on_init(
   }
 
   node_ = get_node();
-
+  const auto logger = node_->get_logger();
   const auto & hardware_info = get_hardware_info();
   const auto & parameters = hardware_info.hardware_parameters;
-  if (auto it = parameters.find("status_topic"); it != parameters.end()) {
-    status_topic_ = it->second;
-  }
-  if (auto it = parameters.find("cmd_topic"); it != parameters.end()) {
-    cmd_topic_ = it->second;
-  }
-
-  auto read_double = [this, &parameters](const char * name, double & value) {
-      const auto it = parameters.find(name);
-      if (it == parameters.end()) {
-        return true;
-      }
-      try {
-        value = std::stod(it->second);
-        return true;
-      } catch (const std::exception & error) {
-        RCLCPP_ERROR(node_->get_logger(), "Invalid %s: %s", name, error.what());
-        return false;
-      }
-    };
-  auto read_int = [this, &parameters](const char * name, int & value) {
-      const auto it = parameters.find(name);
-      if (it == parameters.end()) {
-        return true;
-      }
-      try {
-        value = std::stoi(it->second);
-        return true;
-      } catch (const std::exception & error) {
-        RCLCPP_ERROR(node_->get_logger(), "Invalid %s: %s", name, error.what());
-        return false;
-      }
-    };
 
   int status_timeout_ms = static_cast<int>(status_timeout_.count());
   const bool parameters_valid =
-    read_int("mode", mode_) &&
-    read_int("gripper_merge_policy", gripper_merge_policy_) &&
-    read_int("status_timeout_ms", status_timeout_ms) &&
-    read_double("gripper_travel", gripper_travel_) &&
-    read_double("gripper_feedback_max", gripper_feedback_max_) &&
-    read_double("gripper_command_max", gripper_command_max_) &&
-    read_double("max_arm_command_velocity", max_arm_command_velocity_) &&
-    read_double("max_arm_command_lead", max_arm_command_lead_);
+    read_parameter(parameters, "status_topic", status_topic_, logger) &&
+    read_parameter(parameters, "cmd_topic", cmd_topic_, logger) &&
+    read_parameter(parameters, "mode", mode_, logger) &&
+    read_parameter(parameters, "status_timeout_ms", status_timeout_ms, logger) &&
+    read_parameter(parameters, "gripper_travel", gripper_travel_, logger) &&
+    read_parameter(parameters, "gripper_feedback_max", gripper_feedback_max_, logger) &&
+    read_parameter(parameters, "gripper_command_max", gripper_command_max_, logger) &&
+    read_parameter(
+    parameters, "max_arm_command_velocity", max_arm_command_velocity_, logger) &&
+    read_parameter(parameters, "max_arm_command_lead", max_arm_command_lead_, logger);
+  if (!parameters_valid) {
+    return CallbackReturn::ERROR;
+  }
+
   status_timeout_ = std::chrono::milliseconds(status_timeout_ms);
 
-  if (!parameters_valid || status_timeout_ms <= 0 || gripper_travel_ <= 0.0 ||
+  if (status_timeout_ms <= 0 || gripper_travel_ <= 0.0 ||
     gripper_feedback_max_ <= 0.0 || gripper_command_max_ <= 0.0 ||
     max_arm_command_velocity_ <= 0.0 || max_arm_command_lead_ <= 0.0)
   {
-    RCLCPP_ERROR(node_->get_logger(), "Hardware scale and limit parameters must be positive");
+    RCLCPP_ERROR(logger, "Hardware scale and limit parameters must be positive");
     return CallbackReturn::ERROR;
   }
 
-  for (const auto & joint : hardware_info.joints) {
+  if (hardware_info.joints.size() != kJointCount) {
+    RCLCPP_ERROR(
+      logger, "Expected %zu joints (joint1..joint8), got %zu",
+      kJointCount, hardware_info.joints.size());
+    return CallbackReturn::ERROR;
+  }
+  // Vendor message arrays have no joint names; their order is part of the ABI.
+  joint_names_.clear();
+  for (size_t index = 0; index < kJointCount; ++index) {
+    const auto expected = "joint" + std::to_string(index + 1);
+    const auto & joint = hardware_info.joints[index];
+    if (joint.name != expected) {
+      RCLCPP_ERROR(
+        logger, "Expected %s at index %zu, got %s",
+        expected.c_str(), index, joint.name.c_str());
+      return CallbackReturn::ERROR;
+    }
     joint_names_.push_back(joint.name);
   }
-  if (joint_names_.size() != 8) {
-    RCLCPP_ERROR(
-      node_->get_logger(), "Expected 8 joints (joint1..joint8), got %zu",
-      joint_names_.size());
-    return CallbackReturn::ERROR;
-  }
 
-  pos_.assign(joint_names_.size(), 0.0);
-  vel_.assign(joint_names_.size(), 0.0);
-  cmd_pos_.assign(joint_names_.size(), 0.0);
-  last_sent_pos_.assign(joint_names_.size(), 0.0);
+  pos_.assign(kJointCount, 0.0);
+  vel_.assign(kJointCount, 0.0);
+  cmd_pos_.assign(kJointCount, 0.0);
+  last_sent_pos_.assign(kJointCount, 0.0);
 
   status_sub_ = node_->create_subscription<arx5_arm_msg::msg::RobotStatus>(
     status_topic_, rclcpp::SensorDataQoS().keep_last(5),
     [this](arx5_arm_msg::msg::RobotStatus::SharedPtr message) {
       std::lock_guard<std::mutex> lock(mtx_);
+      const auto finite = [](double value) {return std::isfinite(value);};
+      if (!std::all_of(message->joint_pos.begin(), message->joint_pos.end(), finite) ||
+      !std::all_of(message->joint_vel.begin(), message->joint_vel.end(), finite))
+      {
+        status_ready_ = false;
+        command_initialized_ = false;
+        RCLCPP_ERROR_THROTTLE(
+          node_->get_logger(), *node_->get_clock(), 2000,
+          "Rejected non-finite ARX status; waiting for valid feedback");
+        return;
+      }
       last_status_ = *message;
       status_ready_ = true;
       last_status_time_ = std::chrono::steady_clock::now();
@@ -128,7 +166,7 @@ CallbackReturn ArxR5aSystem::on_init(
     cmd_topic_, rclcpp::QoS(10));
 
   RCLCPP_INFO(
-    node_->get_logger(),
+    logger,
     "Initialized: arm_limit=%.3f rad/s, arm_lead=%.3f rad, "
     "gripper_feedback_max=%.1f",
     max_arm_command_velocity_, max_arm_command_lead_,
@@ -139,6 +177,7 @@ CallbackReturn ArxR5aSystem::on_init(
 CallbackReturn ArxR5aSystem::on_activate(const rclcpp_lifecycle::State &)
 {
   std::lock_guard<std::mutex> lock(mtx_);
+  // The first fresh status in read() seeds the commands from the measured pose.
   command_initialized_ = false;
   RCLCPP_INFO(node_->get_logger(), "ArxR5aSystem activated");
   return CallbackReturn::SUCCESS;
@@ -148,16 +187,16 @@ CallbackReturn ArxR5aSystem::on_deactivate(const rclcpp_lifecycle::State &)
 {
   std::lock_guard<std::mutex> lock(mtx_);
   if (cmd_pub_ && command_initialized_) {
+    // Send one final command that holds the measured pose in vendor PROTECT mode.
     arx5_arm_msg::msg::RobotCmd command;
     command.header.stamp = node_->get_clock()->now();
     command.end_pos.fill(0.0);
-    for (size_t index = 0; index < 6; ++index) {
+    for (size_t index = 0; index < kArmJointCount; ++index) {
       command.joint_pos[index] = pos_[index];
     }
-    const double gripper_position = std::clamp(
-      merge_gripper(pos_[6], pos_[7]), 0.0, gripper_travel_);
-    command.gripper = gripper_position / gripper_travel_ * gripper_command_max_;
-    command.mode = 2;
+    const double gripper_position = std::clamp(pos_[kJoint7], 0.0, gripper_travel_);
+    command.gripper = to_vendor_gripper(gripper_position);
+    command.mode = kVendorModeProtect;
     cmd_pub_->publish(command);
   }
   command_initialized_ = false;
@@ -168,8 +207,8 @@ CallbackReturn ArxR5aSystem::on_deactivate(const rclcpp_lifecycle::State &)
 std::vector<hardware_interface::StateInterface> ArxR5aSystem::export_state_interfaces()
 {
   std::vector<hardware_interface::StateInterface> interfaces;
-  interfaces.reserve(nj() * 2);
-  for (size_t index = 0; index < nj(); ++index) {
+  interfaces.reserve(joint_names_.size() * 2);
+  for (size_t index = 0; index < joint_names_.size(); ++index) {
     interfaces.emplace_back(
       joint_names_[index], hardware_interface::HW_IF_POSITION, &pos_[index]);
     interfaces.emplace_back(
@@ -180,6 +219,8 @@ std::vector<hardware_interface::StateInterface> ArxR5aSystem::export_state_inter
 
 std::vector<hardware_interface::CommandInterface> ArxR5aSystem::export_command_interfaces()
 {
+  // Only joints that declare a position command interface in the URDF get one;
+  // joint8 mirrors joint7 and is state-only.
   std::vector<hardware_interface::CommandInterface> interfaces;
   const auto & joints = get_hardware_info().joints;
   for (size_t index = 0; index < joints.size(); ++index) {
@@ -200,35 +241,35 @@ return_type ArxR5aSystem::read(const rclcpp::Time &, const rclcpp::Duration &)
     return return_type::OK;
   }
 
-  for (size_t index = 0; index < 6; ++index) {
+  for (size_t index = 0; index < kArmJointCount; ++index) {
     pos_[index] = last_status_.joint_pos[index];
     vel_[index] = last_status_.joint_vel[index];
   }
 
+  // The vendor reports one gripper value in [0, gripper_feedback_max]; both
+  // fingers report the same opening in metres.
   const double gripper_feedback = std::clamp(
-    last_status_.joint_pos[6], 0.0, gripper_feedback_max_);
+    last_status_.joint_pos[kJoint7], 0.0, gripper_feedback_max_);
   const double gripper_position =
     gripper_feedback / gripper_feedback_max_ * gripper_travel_;
   const double gripper_velocity =
-    last_status_.joint_vel[6] / gripper_feedback_max_ * gripper_travel_;
-  pos_[6] = gripper_position;
-  pos_[7] = gripper_position;
-  vel_[6] = gripper_velocity;
-  vel_[7] = gripper_velocity;
+    last_status_.joint_vel[kJoint7] / gripper_feedback_max_ * gripper_travel_;
+  pos_[kJoint7] = gripper_position;
+  pos_[kJoint8] = gripper_position;
+  vel_[kJoint7] = gripper_velocity;
+  vel_[kJoint8] = gripper_velocity;
 
-  const bool status_fresh =
-    std::chrono::steady_clock::now() - last_status_time_ <= status_timeout_;
-  if (!command_initialized_ && status_fresh) {
+  if (!command_initialized_ && status_fresh()) {
     cmd_pos_ = pos_;
     last_sent_pos_ = pos_;
     command_initialized_ = true;
     RCLCPP_INFO(node_->get_logger(), "Commands initialized from hardware state");
   }
 
-  RCLCPP_INFO_THROTTLE(
+  RCLCPP_DEBUG_THROTTLE(
     node_->get_logger(), *node_->get_clock(), 2000,
     "Hardware state: [%.3f %.3f %.3f %.3f %.3f %.3f], gripper=%.3f m",
-    pos_[0], pos_[1], pos_[2], pos_[3], pos_[4], pos_[5], pos_[6]);
+    pos_[0], pos_[1], pos_[2], pos_[3], pos_[4], pos_[5], pos_[kJoint7]);
   return return_type::OK;
 }
 
@@ -237,9 +278,9 @@ return_type ArxR5aSystem::write(
 {
   {
     std::lock_guard<std::mutex> lock(mtx_);
-    const bool status_stale = !status_ready_ ||
-      std::chrono::steady_clock::now() - last_status_time_ > status_timeout_;
+    const bool status_stale = !status_fresh();
     if (!command_initialized_ || status_stale) {
+      // Re-seed from the measured pose once status resumes.
       if (status_stale) {
         command_initialized_ = false;
       }
@@ -252,7 +293,7 @@ return_type ArxR5aSystem::write(
 
   double seconds = period.seconds();
   if (!std::isfinite(seconds) || seconds <= 0.0) {
-    seconds = 0.005;
+    seconds = kFallbackPeriodSeconds;
   }
 
   arx5_arm_msg::msg::RobotCmd command;
@@ -260,8 +301,11 @@ return_type ArxR5aSystem::write(
   command.end_pos.fill(0.0);
   command.mode = mode_;
 
+  // Rate-limit each arm joint toward its target and keep the command within
+  // max_arm_command_lead of the measured position. These bounds apply to
+  // outgoing commands, not to the physical response of the vendor controller.
   const double arm_max_step = max_arm_command_velocity_ * seconds;
-  for (size_t index = 0; index < 6; ++index) {
+  for (size_t index = 0; index < kArmJointCount; ++index) {
     if (!std::isfinite(cmd_pos_[index]) || !std::isfinite(pos_[index])) {
       RCLCPP_ERROR_THROTTLE(
         node_->get_logger(), *node_->get_clock(), 2000,
@@ -277,17 +321,16 @@ return_type ArxR5aSystem::write(
     command.joint_pos[index] = last_sent_pos_[index];
   }
 
-  if (!std::isfinite(cmd_pos_[6]) || !std::isfinite(cmd_pos_[7])) {
+  if (!std::isfinite(cmd_pos_[kJoint7])) {
     RCLCPP_ERROR_THROTTLE(
       node_->get_logger(), *node_->get_clock(), 2000,
       "Suppressing non-finite gripper command");
     return return_type::ERROR;
   }
-  const double requested_gripper = std::clamp(
-    merge_gripper(cmd_pos_[6], cmd_pos_[7]), 0.0, gripper_travel_);
-  last_sent_pos_[6] = requested_gripper;
-  last_sent_pos_[7] = requested_gripper;
-  command.gripper = requested_gripper / gripper_travel_ * gripper_command_max_;
+  const double requested_gripper = std::clamp(cmd_pos_[kJoint7], 0.0, gripper_travel_);
+  last_sent_pos_[kJoint7] = requested_gripper;
+  last_sent_pos_[kJoint8] = requested_gripper;
+  command.gripper = to_vendor_gripper(requested_gripper);
 
   cmd_pub_->publish(command);
   return return_type::OK;

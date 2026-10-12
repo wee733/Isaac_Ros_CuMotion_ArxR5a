@@ -20,6 +20,12 @@
 namespace isaac_ros_manipulation_arx_r5a_ros2_control
 {
 
+/// ros2_control system that bridges position interfaces to the ARX vendor driver.
+///
+/// The vendor driver owns CAN communication. It publishes RobotStatus on
+/// `status_topic` and accepts RobotCmd on `cmd_topic`. joint1..joint6 are the
+/// arm. joint7 commands the single vendor gripper value; joint8 is the mimic
+/// finger and only reports state.
 class ArxR5aSystem : public hardware_interface::SystemInterface
 {
 public:
@@ -41,22 +47,25 @@ public:
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
 private:
+  /// Convert a gripper opening in metres to the vendor command scale.
+  double to_vendor_gripper(double position) const;
+  /// True when a status message arrived within `status_timeout_`. Requires `mtx_`.
+  bool status_fresh() const;
+
   rclcpp::Node::SharedPtr node_;
   rclcpp::Subscription<arx5_arm_msg::msg::RobotStatus>::SharedPtr status_sub_;
   rclcpp::Publisher<arx5_arm_msg::msg::RobotCmd>::SharedPtr cmd_pub_;
 
+  // Hardware parameters from the URDF <ros2_control> block.
   std::string status_topic_{"/arm_status"};
   std::string cmd_topic_{"/arm_cmd"};
-  int mode_{5};
-  double gripper_travel_{0.044};
-  double gripper_feedback_max_{5.0};
-  double gripper_command_max_{5.0};
-  double max_arm_command_velocity_{1.0};
-  double max_arm_command_lead_{0.10};
+  int mode_{5};  // RobotCmd::mode while active; 5 is vendor POSITION_CONTROL.
+  double gripper_travel_{0.044};  // Finger opening in metres at full vendor scale.
+  double gripper_feedback_max_{5.0};  // Vendor feedback value at full opening.
+  double gripper_command_max_{5.0};  // Vendor command value at full opening.
+  double max_arm_command_velocity_{1.0};  // rad/s
+  double max_arm_command_lead_{0.10};  // rad ahead of the measured position
   std::chrono::milliseconds status_timeout_{250};
-
-  // 0=average, 1=joint7, 2=joint8, 3=max, 4=min.
-  int gripper_merge_policy_{0};
 
   std::vector<std::string> joint_names_;
   std::vector<double> pos_;
@@ -64,15 +73,12 @@ private:
   std::vector<double> cmd_pos_;
   std::vector<double> last_sent_pos_;
 
+  // Guards the fields written by the status subscription callback.
   std::mutex mtx_;
   arx5_arm_msg::msg::RobotStatus last_status_;
   bool status_ready_{false};
   bool command_initialized_{false};
   std::chrono::steady_clock::time_point last_status_time_{};
-
-  inline size_t nj() const {return joint_names_.size();}
-
-  double merge_gripper(double j7, double j8) const;
 };
 
 }  // namespace isaac_ros_manipulation_arx_r5a_ros2_control
